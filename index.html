@@ -4,175 +4,199 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="コエメモ">
-<title>コエメモ | TAKOYAKI PROJECT</title>
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="聖徳太子">
+<title>聖徳太子</title>
 <style>
   :root{
-    --bg:#16181D;
-    --surface:#21242B;
-    --line:#31353E;
-    --text:#E8EAED;
-    --muted:#8B919A;
-    --rec:#E5484D;
-    --amber:#F5A623;
-    --radius:16px;
+    --paper:#F4F5F3;
+    --card:#FBFBFA;
+    --ink:#2B302E;
+    --muted:#9AA09C;
+    --faint:#C7CBC7;
+    --line:#E6E8E4;
+    --accent:#5B7B77;      /* 落ち着いたスレートグリーン */
+    --accent-soft:#5B7B7722;
+    --radius:22px;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
   body{
-    background:var(--bg);
-    color:var(--text);
+    background:var(--paper);
+    color:var(--ink);
     font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     -webkit-font-smoothing:antialiased;
   }
-  .app{max-width:560px;margin:0 auto;padding:16px 16px 48px;}
+  .app{max-width:520px;margin:0 auto;padding:14px 16px 48px;}
 
-  /* ---- ヘッダー ---- */
+  /* ---- 目立たないトップバー ---- */
   header{
     display:flex;align-items:center;justify-content:space-between;
-    padding:8px 4px 20px;
+    padding:6px 6px 14px;
   }
-  header h1{font-size:17px;font-weight:700;letter-spacing:.04em;}
-  header h1 span{color:var(--amber);}
+  header .brand{font-size:12px;letter-spacing:.22em;color:var(--faint);font-weight:600;}
   .gear{
-    background:none;border:1px solid var(--line);color:var(--muted);
-    width:38px;height:38px;border-radius:50%;font-size:17px;cursor:pointer;
+    background:none;border:none;color:var(--faint);
+    width:34px;height:34px;font-size:18px;cursor:pointer;line-height:1;
   }
 
-  /* ---- レコーダーパネル ---- */
-  .recorder{
-    background:var(--surface);
+  /* ---- 卓上時計風 待機カード(タップで開始/停止) ---- */
+  .clock{
+    background:var(--card);
     border:1px solid var(--line);
     border-radius:var(--radius);
-    padding:24px 20px 28px;
+    padding:40px 24px 34px;
     text-align:center;
+    cursor:pointer;
+    user-select:none;
+    transition:transform .12s ease, box-shadow .3s ease;
+    box-shadow:0 1px 0 rgba(0,0,0,.02);
   }
-  .lcd{
-    font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
-    font-variant-numeric:tabular-nums;
-    font-size:44px;font-weight:500;letter-spacing:.06em;
-    color:var(--amber);
-    text-shadow:0 0 18px rgba(245,166,35,.35);
-    margin-bottom:4px;
-  }
-  .lcd.idle{color:#4A4F58;text-shadow:none;}
-  .status{font-size:12px;color:var(--muted);height:18px;letter-spacing:.08em;}
-  .status .dot{
-    display:inline-block;width:8px;height:8px;border-radius:50%;
-    background:var(--rec);margin-right:6px;vertical-align:1px;
-    animation:blink 1.1s infinite;
-  }
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-
-  canvas#wave{
-    width:100%;height:72px;display:block;margin:16px 0 20px;
+  .clock:active{transform:scale(.992);}
+  .clock.rec{
+    box-shadow:0 0 0 1px var(--accent-soft), 0 8px 30px rgba(91,123,119,.14);
   }
 
-  .rec-btn{
-    width:84px;height:84px;border-radius:50%;
-    border:3px solid var(--line);
-    background:radial-gradient(circle at 35% 30%, #FF6A6E, var(--rec));
-    box-shadow:0 4px 20px rgba(229,72,77,.35);
-    cursor:pointer;transition:transform .1s;
-    position:relative;
+  /* 時計本体(SVGリング + デジタル表示) */
+  .dial{position:relative;width:214px;height:214px;margin:0 auto 8px;}
+  .dial svg{position:absolute;inset:0;transform:rotate(-90deg);}
+  .dial .track{fill:none;stroke:var(--line);stroke-width:3;}
+  .dial .sweep{
+    fill:none;stroke:var(--accent);stroke-width:3;stroke-linecap:round;
+    stroke-dasharray:1 999;opacity:0;transition:opacity .5s;
   }
-  .rec-btn:active{transform:scale(.94);}
-  .rec-btn .core{
-    position:absolute;inset:0;margin:auto;
-    width:30px;height:30px;border-radius:50%;
-    background:rgba(255,255,255,.9);
-    transition:border-radius .25s,width .25s,height .25s;
+  .clock.rec .dial .sweep{opacity:1;}
+  .dial .face{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
   }
-  .rec-btn.recording .core{width:26px;height:26px;border-radius:6px;}
-  .rec-hint{font-size:12px;color:var(--muted);margin-top:12px;}
+  .time{
+    font-size:52px;font-weight:200;letter-spacing:.02em;
+    font-variant-numeric:tabular-nums;line-height:1;
+  }
+  .time .colon{transition:opacity .3s;}
+  .time .colon.blink{animation:softblink 2s steps(1) infinite;}
+  @keyframes softblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
+  .date{font-size:12px;color:var(--muted);margin-top:10px;letter-spacing:.14em;}
+
+  /* 待機/記録の状態表示(ごく控えめ) */
+  .state{margin-top:22px;height:22px;font-size:13px;color:var(--muted);letter-spacing:.06em;}
+  .state .live{color:var(--accent);font-weight:600;}
+  .state .live .pip{
+    display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--accent);margin-right:7px;vertical-align:1px;
+    animation:breathe 2.4s ease-in-out infinite;
+  }
+  @keyframes breathe{0%,100%{opacity:1}50%{opacity:.3}}
+  .elapsed{
+    font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);
+    letter-spacing:.08em;
+  }
 
   /* ---- 処理中/エラー ---- */
   .notice{
-    margin-top:16px;padding:14px;border-radius:12px;
-    font-size:13px;line-height:1.7;display:none;text-align:left;
+    margin-top:14px;padding:14px 16px;border-radius:14px;
+    font-size:13px;line-height:1.75;display:none;text-align:left;
   }
-  .notice.busy{display:block;background:rgba(245,166,35,.08);color:var(--amber);border:1px solid rgba(245,166,35,.3);}
-  .notice.error{display:block;background:rgba(229,72,77,.08);color:#FF8A8E;border:1px solid rgba(229,72,77,.3);}
+  .notice.busy{display:block;background:var(--accent-soft);color:var(--accent);}
+  .notice.error{display:block;background:#B44a3a12;color:#A24736;}
   .notice button{
-    margin-top:8px;background:none;border:1px solid currentColor;color:inherit;
-    padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;
+    margin-top:9px;background:none;border:1px solid currentColor;color:inherit;
+    padding:7px 15px;border-radius:9px;font-size:12px;cursor:pointer;
   }
 
+  /* ---- 出力フォーマット切替 ---- */
   /* ---- 履歴 ---- */
   .history-head{
     display:flex;align-items:baseline;justify-content:space-between;
-    margin:32px 4px 12px;
+    margin:30px 6px 12px;
   }
-  .history-head h2{font-size:14px;font-weight:600;color:var(--muted);letter-spacing:.1em;}
-  .history-head small{font-size:11px;color:#565B64;}
+  .history-head h2{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.16em;}
+  .history-head small{font-size:11px;color:var(--faint);}
   .card{
-    background:var(--surface);border:1px solid var(--line);
-    border-radius:var(--radius);padding:16px;margin-bottom:12px;
+    background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:16px;margin-bottom:11px;
   }
   .card .meta{
     display:flex;justify-content:space-between;align-items:center;
-    font-size:11px;color:var(--muted);margin-bottom:8px;
-    font-family:ui-monospace,Menlo,monospace;
+    font-size:11px;color:var(--muted);margin-bottom:9px;
+    font-variant-numeric:tabular-nums;letter-spacing:.04em;
+  }
+  .card .tabs{
+    display:flex;gap:6px;margin-bottom:11px;
+  }
+  .card .tabs button{
+    background:none;border:1px solid var(--line);color:var(--muted);
+    padding:5px 12px;border-radius:999px;font-size:11px;cursor:pointer;
+    letter-spacing:.04em;
+  }
+  .card .tabs button.active{
+    background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent);font-weight:600;
   }
   .card .text{
-    font-size:14px;line-height:1.9;white-space:pre-wrap;word-break:break-word;
-    max-height:5.7em;overflow:hidden;position:relative;
+    font-size:14px;line-height:1.95;white-space:pre-wrap;word-break:break-word;
+    max-height:6.2em;overflow:hidden;position:relative;
   }
   .card.open .text{max-height:none;}
   .card .text.clamped::after{
-    content:"";position:absolute;bottom:0;left:0;right:0;height:1.9em;
-    background:linear-gradient(transparent,var(--surface));
+    content:"";position:absolute;bottom:0;left:0;right:0;height:2em;
+    background:linear-gradient(transparent,var(--card));
   }
   .card.open .text.clamped::after{display:none;}
-  .card .actions{display:flex;gap:8px;margin-top:12px;}
+  .card .actions{display:flex;gap:8px;margin-top:13px;}
   .card .actions button{
     flex:1;background:none;border:1px solid var(--line);color:var(--muted);
-    padding:9px 0;border-radius:10px;font-size:12px;cursor:pointer;
+    padding:9px 0;border-radius:10px;font-size:12px;cursor:pointer;letter-spacing:.04em;
   }
-  .card .actions button.danger{color:#FF8A8E;border-color:rgba(229,72,77,.35);}
+  .card .actions button.primary{color:var(--accent);border-color:var(--accent-soft);}
+  .card .actions button.danger{color:#A24736;border-color:#A2473622;}
   .empty{
-    text-align:center;color:#565B64;font-size:13px;padding:32px 0;line-height:1.8;
+    text-align:center;color:var(--faint);font-size:13px;padding:30px 0;line-height:1.9;
   }
 
   /* ---- 設定モーダル ---- */
   .modal-bg{
-    position:fixed;inset:0;background:rgba(0,0,0,.6);
+    position:fixed;inset:0;background:rgba(40,45,42,.4);
     display:none;align-items:flex-end;justify-content:center;z-index:10;
+    backdrop-filter:blur(2px);
   }
   .modal-bg.show{display:flex;}
   .modal{
-    background:var(--surface);border-top:1px solid var(--line);
-    border-radius:20px 20px 0 0;width:100%;max-width:560px;
-    padding:24px 20px calc(32px + env(safe-area-inset-bottom));
+    background:var(--card);border-radius:24px 24px 0 0;
+    width:100%;max-width:520px;
+    padding:26px 22px calc(30px + env(safe-area-inset-bottom));
+    box-shadow:0 -8px 40px rgba(0,0,0,.12);
   }
   .modal h3{font-size:15px;margin-bottom:6px;}
-  .modal p{font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:14px;}
-  .modal input{
-    width:100%;background:var(--bg);border:1px solid var(--line);
-    color:var(--text);padding:13px 14px;border-radius:10px;font-size:14px;
-    font-family:ui-monospace,Menlo,monospace;
+  .modal p{font-size:12px;color:var(--muted);line-height:1.85;margin-bottom:14px;}
+  .modal label.fld{display:block;font-size:11px;color:var(--muted);margin:16px 0 6px;letter-spacing:.08em;}
+  .modal input, .modal textarea, .modal select{
+    width:100%;background:var(--paper);border:1px solid var(--line);
+    color:var(--ink);padding:12px 13px;border-radius:11px;font-size:14px;
+    font-family:inherit;line-height:1.7;resize:vertical;
+    -webkit-appearance:none;appearance:none;
   }
-  .modal .row{display:flex;gap:10px;margin-top:16px;}
+  .modal input.key{font-family:ui-monospace,Menlo,monospace;}
+  .modal .row{display:flex;gap:10px;margin-top:20px;}
   .modal .row button{
-    flex:1;padding:13px 0;border-radius:12px;font-size:14px;cursor:pointer;border:none;
+    flex:1;padding:13px 0;border-radius:13px;font-size:14px;cursor:pointer;border:none;letter-spacing:.04em;
   }
-  .btn-save{background:var(--amber);color:#16181D;font-weight:700;}
+  .btn-save{background:var(--accent);color:#fff;font-weight:600;}
   .btn-cancel{background:none;border:1px solid var(--line)!important;color:var(--muted);}
 
   .toast{
     position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));
     transform:translateX(-50%) translateY(20px);
-    background:var(--text);color:var(--bg);font-size:13px;font-weight:600;
-    padding:10px 20px;border-radius:999px;opacity:0;pointer-events:none;
-    transition:all .25s;z-index:20;
+    background:var(--ink);color:var(--paper);font-size:13px;font-weight:500;
+    padding:11px 22px;border-radius:999px;opacity:0;pointer-events:none;
+    transition:all .25s;z-index:20;letter-spacing:.04em;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
   @media (prefers-reduced-motion:reduce){
-    .status .dot{animation:none;}
-    .rec-btn,.rec-btn .core,.toast{transition:none;}
+    .time .colon.blink,.state .live .pip{animation:none;}
+    .clock,.toast{transition:none;}
   }
 </style>
 </head>
@@ -180,23 +204,29 @@
 <div class="app">
 
   <header>
-    <h1>コエメモ <span>●</span></h1>
+    <span class="brand">聖徳太子</span>
     <button class="gear" id="gearBtn" aria-label="設定">⚙</button>
   </header>
 
-  <section class="recorder">
-    <div class="lcd idle" id="timer">00:00</div>
-    <div class="status" id="status">タップして録音を開始</div>
-    <canvas id="wave"></canvas>
-    <button class="rec-btn" id="recBtn" aria-label="録音">
-      <span class="core"></span>
-    </button>
-    <div class="rec-hint" id="hint">録音中は画面をつけたままにしてください</div>
-    <div class="notice" id="notice"></div>
+  <!-- 卓上時計風カード:どこをタップしても録音開始/停止 -->
+  <section class="clock" id="clockCard" role="button" tabindex="0" aria-label="タップして録音を開始・停止">
+    <div class="dial">
+      <svg viewBox="0 0 214 214" aria-hidden="true">
+        <circle class="track" cx="107" cy="107" r="101"></circle>
+        <circle class="sweep" id="sweep" cx="107" cy="107" r="101"></circle>
+      </svg>
+      <div class="face">
+        <div class="time" id="clock"><span id="hh">--</span><span class="colon blink" id="colon">:</span><span id="mm">--</span></div>
+        <div class="date" id="date"></div>
+      </div>
+    </div>
+    <div class="state" id="state">画面に触れて録音を開始</div>
   </section>
 
+  <div class="notice" id="notice"></div>
+
   <div class="history-head">
-    <h2>これまでの記録</h2>
+    <h2>記録</h2>
     <small id="count"></small>
   </div>
   <div id="history"></div>
@@ -206,9 +236,12 @@
 <!-- 設定モーダル -->
 <div class="modal-bg" id="modalBg">
   <div class="modal">
-    <h3>OpenAI APIキー</h3>
-    <p>文字起こし(Whisper API)に使います。キーはこの端末のブラウザ内(localStorage)にだけ保存され、外部には送信されません。</p>
-    <input type="password" id="keyInput" placeholder="sk-..." autocomplete="off">
+    <h3>設定</h3>
+    <p>OpenAIのAPIキーは、この端末のブラウザ内にだけ保存されます。録音・文字起こしのデータもクラウドには残さず、端末内にのみ保存します。</p>
+    <label class="fld" for="keyInput">OpenAI APIキー</label>
+    <input class="key" type="password" id="keyInput" placeholder="sk-..." autocomplete="off">
+    <label class="fld" for="sendMail">完成後の送信先メール（任意）</label>
+    <input type="email" id="sendMail" placeholder="日報の提出先など" autocomplete="off">
     <div class="row">
       <button class="btn-cancel" id="cancelBtn">閉じる</button>
       <button class="btn-save" id="saveBtn">保存</button>
@@ -220,312 +253,276 @@
 
 <script>
 (() => {
-  const KEY_STORAGE = 'koememo_api_key';
-  const HISTORY_STORAGE = 'koememo_history';
+  const KEY = 'koememo_api_key';
+  const MAIL = 'koememo_mail';
+  const HIST = 'koememo_history_v2';
+
+  // ============================================================
+  // ここが唯一の「フォーマット定義」箇所です。
+  // 配布先(職場/業種)ごとに書き換える場合は、この1ブロックだけを差し替えてください。
+  // ============================================================
+  const REPORT_CONFIG = {
+    // AIに渡す整形指示。書式や項目を変えたいときはここを編集する。
+    systemPrompt:
+      '次の会話の文字起こしを、商談記録として日本語でまとめてください。' +
+      '出力は必ず以下の2部構成にしてください。憶測で補完せず、聞き取れない項目は「（記載なし）」としてください。\n\n' +
+      '【1部: 商談メモ】(5行程度、簡潔に、箇条書き)\n' +
+      '・日時\n' +
+      '・お客様（お名前・ご家族構成）: 固有の名前が会話に出ればお名前で。出ない場合は「奥様」「ご子息様」のような続柄と人数を、会話中の呼び方をもとに記載する。人数・続柄も分からなければ（記載なし）とする\n' +
+      '・議題・訪問目的\n' +
+      '・お客様の反応・温度感: 前向き／様子見／保留 のいずれかに近い一言で\n' +
+      '・次回アクション: いつ・何をするか\n\n' +
+      '【2部: 商談まとめ】(A4一枚程度)\n' +
+      'お客様のご意向・ご要望、提案・説明した内容、質疑応答の要点、次回に向けた課題を、読みやすい文章でまとめる。',
+  };
 
   const $ = id => document.getElementById(id);
-  const timerEl = $('timer'), statusEl = $('status'), recBtn = $('recBtn'),
-        noticeEl = $('notice'), historyEl = $('history'), countEl = $('count'),
-        modalBg = $('modalBg'), keyInput = $('keyInput'), toastEl = $('toast'),
-        canvas = $('wave'), hintEl = $('hint');
+  const clockCard=$('clockCard'), hhEl=$('hh'), mmEl=$('mm'), colonEl=$('colon'),
+        dateEl=$('date'), stateEl=$('state'), sweepEl=$('sweep'),
+        noticeEl=$('notice'), historyEl=$('history'), countEl=$('count'),
+        modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
+        toastEl=$('toast');
 
-  let mediaRecorder = null;
-  let chunks = [];
-  let stream = null;
-  let startTime = 0;
-  let timerId = null;
-  let audioCtx = null, analyser = null, rafId = null;
-  let wakeLock = null;
-  let lastBlob = null;   // 失敗時の再送信用
-  let lastDuration = 0;
-  let mimeType = '', ext = '';
+  const R = 101, CIRC = 2 * Math.PI * R;
 
-  // ---- 録音フォーマット判定(iOS Safari は audio/mp4)----
+  let mediaRecorder=null, chunks=[], stream=null;
+  let recording=false, startTime=0, uiTimer=null;
+  let audioCtx=null, wakeLock=null;
+  let lastBlob=null, lastDuration=0, mimeType='', ext='';
+
+  // ===== 時計表示 =====
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function updateClock(){
+    const now = new Date();
+    hhEl.textContent = pad(now.getHours());
+    mmEl.textContent = pad(now.getMinutes());
+    dateEl.textContent = now.toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'short'});
+    // 録音中は秒に応じてリングをゆっくり回す(秒針のように=時計に見える)
+    if (recording){
+      const sec = now.getSeconds() + now.getMilliseconds()/1000;
+      const len = (sec/60) * CIRC;
+      sweepEl.style.strokeDasharray = `${len} ${CIRC}`;
+    }
+  }
+  setInterval(updateClock, 250);
+  updateClock();
+
+  // ===== 録音フォーマット判定 =====
   function pickMime(){
-    const candidates = [
-      ['audio/mp4', 'mp4'],
-      ['audio/webm;codecs=opus', 'webm'],
-      ['audio/webm', 'webm'],
-    ];
-    for (const [m, e] of candidates){
-      if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return [m, e];
-    }
-    return ['', 'webm'];
+    const c=[['audio/mp4','mp4'],['audio/webm;codecs=opus','webm'],['audio/webm','webm']];
+    for(const [m,e] of c){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m)) return [m,e]; }
+    return ['','webm'];
   }
+  function fmtTime(sec){ return `${pad(Math.floor(sec/60))}:${pad(Math.floor(sec%60))}`; }
 
-  // ---- タイマー ----
-  function fmt(sec){
-    const m = String(Math.floor(sec/60)).padStart(2,'0');
-    const s = String(Math.floor(sec%60)).padStart(2,'0');
-    return `${m}:${s}`;
-  }
-  function tick(){
-    const sec = (Date.now() - startTime)/1000;
-    timerEl.textContent = fmt(sec);
-  }
+  function notice(type, html){ noticeEl.className='notice '+type; noticeEl.innerHTML=html; }
+  function clearNotice(){ noticeEl.className='notice'; noticeEl.innerHTML=''; }
+  function toast(msg){ toastEl.textContent=msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'),1900); }
 
-  // ---- 波形 ----
-  function setupCanvas(){
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvas.clientWidth * dpr;
-    canvas.height = canvas.clientHeight * dpr;
-  }
-  function drawWave(){
-    const ctx = canvas.getContext('2d');
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    const loop = () => {
-      rafId = requestAnimationFrame(loop);
-      analyser.getByteTimeDomainData(data);
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.lineWidth = 2 * (window.devicePixelRatio||1);
-      ctx.strokeStyle = '#F5A623';
-      ctx.shadowColor = 'rgba(245,166,35,.5)';
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      const step = canvas.width / data.length;
-      for (let i=0;i<data.length;i++){
-        const y = (data[i]/255) * canvas.height;
-        i===0 ? ctx.moveTo(0,y) : ctx.lineTo(i*step,y);
-      }
-      ctx.stroke();
-    };
-    loop();
-  }
-  function drawIdleLine(){
-    setupCanvas();
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.lineWidth = 2 * (window.devicePixelRatio||1);
-    ctx.strokeStyle = '#31353E';
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height/2);
-    ctx.lineTo(canvas.width, canvas.height/2);
-    ctx.stroke();
-  }
-
-  // ---- 通知表示 ----
-  function notice(type, html){
-    noticeEl.className = 'notice ' + type;
-    noticeEl.innerHTML = html;
-  }
-  function clearNotice(){ noticeEl.className = 'notice'; noticeEl.innerHTML = ''; }
-  function toast(msg){
-    toastEl.textContent = msg;
-    toastEl.classList.add('show');
-    setTimeout(()=>toastEl.classList.remove('show'), 1800);
-  }
-
-  // ---- 録音開始/停止 ----
-  async function startRecording(){
-    if (!localStorage.getItem(KEY_STORAGE)){
-      openModal();
-      toast('先にAPIキーを設定してください');
-      return;
-    }
-    try{
-      stream = await navigator.mediaDevices.getUserMedia({audio:true});
-    }catch(e){
-      notice('error','マイクを使用できませんでした。<br>設定アプリ → Safari → マイク で許可を確認してください。');
-      return;
-    }
+  // ===== 録音 =====
+  async function start(){
+    if(!localStorage.getItem(KEY)){ openModal(); toast('先にAPIキーを設定してください'); return; }
+    try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+    catch(e){ notice('error','マイクを使用できませんでした。設定 → Safari → マイク で許可を確認してください。'); return; }
     clearNotice();
     [mimeType, ext] = pickMime();
-    chunks = [];
-    mediaRecorder = new MediaRecorder(stream, mimeType ? {mimeType} : undefined);
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    chunks=[];
+    mediaRecorder = new MediaRecorder(stream, mimeType?{mimeType}:undefined);
+    mediaRecorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
     mediaRecorder.onstop = onStopped;
-    mediaRecorder.start(1000); // 1秒ごとにチャンク化(長時間録音の安全策)
-
-    // 波形
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const src = audioCtx.createMediaStreamSource(stream);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 1024;
-    src.connect(analyser);
-    setupCanvas();
-    drawWave();
-
-    // 画面スリープ防止(対応端末のみ)
+    mediaRecorder.start(1000);
     try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(e){}
 
-    startTime = Date.now();
-    timerId = setInterval(tick, 250);
-    timerEl.classList.remove('idle');
-    recBtn.classList.add('recording');
-    statusEl.innerHTML = '<span class="dot"></span>録音中';
-    hintEl.textContent = 'もう一度タップで停止 → 自動で文字起こしします';
+    recording=true; startTime=Date.now();
+    clockCard.classList.add('rec');
+    colonEl.classList.remove('blink');   // 録音中はコロンが点滅を止める(操作者だけが分かる合図)
+    renderState();
+    uiTimer = setInterval(renderState, 500);
   }
 
-  function stopRecording(){
-    lastDuration = Math.floor((Date.now() - startTime)/1000);
+  function renderState(){
+    const sec = Math.floor((Date.now()-startTime)/1000);
+    stateEl.innerHTML = `<span class="live"><span class="pip"></span>記録中</span>　<span class="elapsed">${fmtTime(sec)}</span>`;
+  }
+
+  function stop(){
+    lastDuration = Math.floor((Date.now()-startTime)/1000);
+    recording=false;
+    clearInterval(uiTimer);
     mediaRecorder.stop();
-    clearInterval(timerId);
-    cancelAnimationFrame(rafId);
-    if (audioCtx){ audioCtx.close(); audioCtx = null; }
-    if (wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
-    stream.getTracks().forEach(t => t.stop());
-    recBtn.classList.remove('recording');
-    statusEl.textContent = '処理中…';
-    hintEl.textContent = '';
-    drawIdleLine();
+    if(audioCtx){ audioCtx.close(); audioCtx=null; }
+    if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
+    stream.getTracks().forEach(t=>t.stop());
+    clockCard.classList.remove('rec');
+    colonEl.classList.add('blink');
+    sweepEl.style.strokeDasharray = `1 ${CIRC}`;
+    stateEl.textContent = '処理中…';
   }
 
   async function onStopped(){
-    const blob = new Blob(chunks, {type: mimeType || 'audio/webm'});
+    const blob = new Blob(chunks,{type:mimeType||'audio/webm'});
     lastBlob = blob;
-    if (blob.size < 2000){
-      resetUI();
-      notice('error','録音が短すぎるか、音声が取得できませんでした。もう一度お試しください。');
-      return;
-    }
-    if (blob.size > 24*1024*1024){
-      resetUI();
-      notice('error','録音が長すぎます(Whisper APIの上限は約25MBです)。録音を分けてお試しください。');
-      return;
-    }
+    if(blob.size<2000){ resetState(); notice('error','録音が短すぎるようです。もう一度お試しください。'); return; }
+    if(blob.size>24*1024*1024){ resetState(); notice('error','録音が長すぎます（上限は約25MB）。分けて録音してください。'); return; }
     await transcribe(blob);
   }
 
-  // ---- Whisper API ----
+  function resetState(){ stateEl.textContent='画面に触れて録音を開始'; }
+
+  // ===== 文字起こし(Whisper) → 必要なら整形(Chat) =====
   async function transcribe(blob){
-    notice('busy','文字起こし中です… 録音が長いほど時間がかかります(画面はこのままで)。');
-    const key = localStorage.getItem(KEY_STORAGE);
+    notice('busy','文字起こし中です…（録音が長いほど時間がかかります）');
+    const key = localStorage.getItem(KEY);
     const fd = new FormData();
-    fd.append('file', blob, 'recording.' + ext);
-    fd.append('model', 'whisper-1');
-    fd.append('language', 'ja');
+    fd.append('file', blob, 'rec.'+ext);
+    fd.append('model','whisper-1');
+    fd.append('language','ja');
     try{
-      const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method:'POST',
-        headers:{ 'Authorization':'Bearer ' + key },
-        body: fd,
+      const res = await fetch('https://api.openai.com/v1/audio/transcriptions',{
+        method:'POST', headers:{'Authorization':'Bearer '+key}, body:fd
       });
-      if (!res.ok){
-        const errText = res.status === 401
-          ? 'APIキーが正しくないようです。設定(⚙)から確認してください。'
-          : `文字起こしに失敗しました(エラー ${res.status})。`;
-        notice('error', errText + '<br><button id="retryBtn">同じ録音でもう一度試す</button>');
-        $('retryBtn').onclick = () => transcribe(lastBlob);
-        resetUI();
-        return;
+      if(!res.ok){
+        const msg = res.status===401 ? 'APIキーが正しくないようです。設定から確認してください。'
+                                     : `文字起こしに失敗しました（エラー ${res.status}）。`;
+        notice('error', msg+'<br><button id="retryBtn">同じ録音でもう一度試す</button>');
+        $('retryBtn').onclick=()=>transcribe(lastBlob);
+        resetState(); return;
       }
       const data = await res.json();
-      saveEntry(data.text || '(音声を認識できませんでした)', lastDuration);
-      lastBlob = null;
-      clearNotice();
-      resetUI();
-      toast('文字起こしが完了しました');
+      const raw = (data.text||'').trim() || '（音声を認識できませんでした）';
+      notice('busy','内容を整えています…');
+      const formatted = await format(raw, key);
+      finish(formatted || raw, raw);
     }catch(e){
       notice('error','通信に失敗しました。電波の良い場所で再送信できます。<br><button id="retryBtn">同じ録音でもう一度試す</button>');
-      $('retryBtn').onclick = () => transcribe(lastBlob);
-      resetUI();
+      $('retryBtn').onclick=()=>transcribe(lastBlob);
+      resetState();
     }
   }
 
-  function resetUI(){
-    timerEl.textContent = '00:00';
-    timerEl.classList.add('idle');
-    statusEl.textContent = 'タップして録音を開始';
-    hintEl.textContent = '録音中は画面をつけたままにしてください';
+  async function format(text, key){
+    try{
+      const res = await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({
+          model:'gpt-4o-mini',
+          messages:[{role:'system',content:REPORT_CONFIG.systemPrompt},{role:'user',content:text}],
+          temperature:0.2
+        })
+      });
+      if(!res.ok) return null;
+      const d = await res.json();
+      return (d.choices?.[0]?.message?.content||'').trim();
+    }catch(e){ return null; }
   }
 
-  // ---- 履歴 ----
-  function loadHistory(){
-    try{ return JSON.parse(localStorage.getItem(HISTORY_STORAGE)) || []; }
-    catch(e){ return []; }
+  function finish(text, raw){
+    saveEntry(text, raw, lastDuration);
+    lastBlob=null; clearNotice(); resetState();
+    toast('記録が完成しました');
   }
-  function saveEntry(text, duration){
-    const list = loadHistory();
+
+  // ===== 履歴 =====
+  function loadHistory(){ try{return JSON.parse(localStorage.getItem(HIST))||[];}catch(e){return [];} }
+  function saveEntry(text, raw, duration){
+    const list=loadHistory();
     list.unshift({
-      id: Date.now(),
-      date: new Date().toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
-      duration: fmt(duration),
-      text,
+      id:Date.now(),
+      date:new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+      duration:fmtTime(duration), text, raw
     });
-    localStorage.setItem(HISTORY_STORAGE, JSON.stringify(list));
+    localStorage.setItem(HIST, JSON.stringify(list));
     renderHistory();
   }
   function deleteEntry(id){
-    const list = loadHistory().filter(e => e.id !== id);
-    localStorage.setItem(HISTORY_STORAGE, JSON.stringify(list));
+    localStorage.setItem(HIST, JSON.stringify(loadHistory().filter(e=>e.id!==id)));
     renderHistory();
   }
   function renderHistory(){
-    const list = loadHistory();
+    const list=loadHistory();
     countEl.textContent = list.length ? `${list.length}件` : '';
-    if (!list.length){
-      historyEl.innerHTML = '<div class="empty">まだ記録がありません。<br>録音すると、ここに文字起こしが並びます。</div>';
+    if(!list.length){
+      historyEl.innerHTML='<div class="empty">まだ記録がありません。<br>面談のあとに、ここへ整理された記録が並びます。</div>';
       return;
     }
-    historyEl.innerHTML = '';
-    for (const e of list){
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <div class="meta"><span>${e.date}</span><span>REC ${e.duration}</span></div>
+    historyEl.innerHTML='';
+    const mail = localStorage.getItem(MAIL)||'';
+    for(const e of list){
+      const hasRaw = e.raw;
+      const card=document.createElement('div'); card.className='card';
+      card.innerHTML=`
+        <div class="meta"><span>${e.date}</span><span>${e.duration}</span></div>
+        ${hasRaw ? `<div class="tabs">
+          <button class="tab-fmt active" data-tab="fmt">商談記録</button>
+          <button class="tab-raw" data-tab="raw">話した内容そのまま</button>
+        </div>` : ''}
         <div class="text"></div>
         <div class="actions">
           <button class="copy">コピー</button>
-          <button class="expand">全文を表示</button>
+          <button class="primary mail">メールで送る</button>
+          <button class="expand">全文</button>
           <button class="danger del">削除</button>
         </div>`;
-      const textDiv = card.querySelector('.text');
-      textDiv.textContent = e.text;
-      // 5行を超えそうならフェードを付ける
+      const t=card.querySelector('.text');
+      let showingRaw = false;
+      const renderText = () => {
+        t.textContent = showingRaw ? e.raw : e.text;
+        t.classList.remove('clamped');
+        requestAnimationFrame(()=>{
+          if(t.scrollHeight>t.clientHeight+4 && !card.classList.contains('open')) t.classList.add('clamped');
+        });
+      };
+      renderText();
+      const expandBtn = card.querySelector('.expand');
       requestAnimationFrame(()=>{
-        if (textDiv.scrollHeight > textDiv.clientHeight + 4) textDiv.classList.add('clamped');
-        else card.querySelector('.expand').style.display = 'none';
+        if(t.scrollHeight<=t.clientHeight+4) expandBtn.style.display='none';
       });
-      card.querySelector('.copy').onclick = async () => {
-        try{ await navigator.clipboard.writeText(e.text); toast('コピーしました'); }
-        catch(err){ toast('コピーできませんでした'); }
+      if(hasRaw){
+        const tabFmt = card.querySelector('.tab-fmt'), tabRaw = card.querySelector('.tab-raw');
+        tabFmt.onclick=()=>{ showingRaw=false; tabFmt.classList.add('active'); tabRaw.classList.remove('active'); renderText(); };
+        tabRaw.onclick=()=>{ showingRaw=true; tabRaw.classList.add('active'); tabFmt.classList.remove('active'); renderText(); };
+      }
+      card.querySelector('.copy').onclick=async()=>{ try{await navigator.clipboard.writeText(showingRaw?e.raw:e.text);toast('コピーしました');}catch(err){toast('コピーできませんでした');} };
+      card.querySelector('.mail').onclick=()=>{
+        const subject=encodeURIComponent(`商談記録 ${e.date}`);
+        const body=encodeURIComponent(e.text);
+        const to=encodeURIComponent(mail);
+        location.href=`mailto:${to}?subject=${subject}&body=${body}`;
       };
-      card.querySelector('.expand').onclick = ev => {
-        card.classList.toggle('open');
-        ev.target.textContent = card.classList.contains('open') ? '折りたたむ' : '全文を表示';
-      };
-      card.querySelector('.del').onclick = () => {
-        if (confirm('この記録を削除しますか?')) deleteEntry(e.id);
-      };
+      expandBtn.onclick=ev=>{ card.classList.toggle('open'); ev.target.textContent=card.classList.contains('open')?'閉じる':'全文'; };
+      card.querySelector('.del').onclick=()=>{ if(confirm('この記録を削除しますか?')) deleteEntry(e.id); };
       historyEl.appendChild(card);
     }
   }
 
-  // ---- 設定モーダル ----
+  // ===== 設定 =====
   function openModal(){
-    keyInput.value = localStorage.getItem(KEY_STORAGE) || '';
+    keyInput.value=localStorage.getItem(KEY)||'';
+    mailInput.value=localStorage.getItem(MAIL)||'';
     modalBg.classList.add('show');
   }
-  $('gearBtn').onclick = openModal;
-  $('cancelBtn').onclick = () => modalBg.classList.remove('show');
-  modalBg.onclick = e => { if (e.target === modalBg) modalBg.classList.remove('show'); };
-  $('saveBtn').onclick = () => {
-    const v = keyInput.value.trim();
-    if (v && !v.startsWith('sk-')){
-      toast('「sk-」で始まるキーを入力してください');
-      return;
-    }
-    if (v) localStorage.setItem(KEY_STORAGE, v);
-    else localStorage.removeItem(KEY_STORAGE);
+  $('gearBtn').onclick=openModal;
+  $('cancelBtn').onclick=()=>modalBg.classList.remove('show');
+  modalBg.onclick=e=>{ if(e.target===modalBg) modalBg.classList.remove('show'); };
+  $('saveBtn').onclick=()=>{
+    const k=keyInput.value.trim(), m=mailInput.value.trim();
+    if(k && !k.startsWith('sk-')){ toast('「sk-」で始まるキーを入力してください'); return; }
+    k?localStorage.setItem(KEY,k):localStorage.removeItem(KEY);
+    m?localStorage.setItem(MAIL,m):localStorage.removeItem(MAIL);
     modalBg.classList.remove('show');
-    toast(v ? 'APIキーを保存しました' : 'APIキーを削除しました');
+    toast('保存しました');
+    renderHistory();
   };
 
-  // ---- 録音ボタン ----
-  recBtn.onclick = () => {
-    if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
-    else startRecording();
-  };
+  // ===== タップで開始/停止(カード全体が対象) =====
+  function toggle(){ recording ? stop() : start(); }
+  clockCard.addEventListener('click', toggle);
+  clockCard.addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(); } });
 
-  // ---- 初期化 ----
-  window.addEventListener('resize', () => {
-    if (!analyser) drawIdleLine();
-  });
-  drawIdleLine();
+  // ===== 初期化 =====
   renderHistory();
-  if (!localStorage.getItem(KEY_STORAGE)){
-    setTimeout(openModal, 400);
-  }
+  if(!localStorage.getItem(KEY)) setTimeout(openModal, 400);
 })();
 </script>
 </body>
