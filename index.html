@@ -424,8 +424,11 @@
   let lastDuration=0, mimeType='', ext='';
 
   // ===== 長時間録音(チャンク分割)のセッション状態 =====
+  // 各チャンクは {idx, blob, status:'recorded'|'sending'|'done'|'failed', text, attempts, authError} で保持する。
+  // 送信に失敗しても blob は破棄せず、復帰後・オンライン復帰後・停止後にまとめて再送する。
   let sessionActive=false, paused=false, ending=false;
-  let chunkIndex=0, chunkPromises=[], rotateTimer=null;
+  let chunkList=[], rotateTimer=null, queuePromise=null;
+  const MAX_RETRY = 3, RETRY_DELAY_MS = 4000;
 
   // ===== 時計表示 =====
   function pad(n){ return String(n).padStart(2,'0'); }
@@ -467,7 +470,7 @@
     try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(e){}
 
     sessionActive=true; paused=false; ending=false;
-    chunkIndex=0; chunkPromises=[];
+    chunkList=[];
     recording=true; startTime=Date.now();
     clockCard.classList.add('rec');
     colonEl.classList.remove('blink');   // 録音中はコロンが点滅を止める(操作者だけが分かる合図)
@@ -520,6 +523,11 @@
     if(document.hidden && sessionActive && !paused && !ending) enterPaused();
   });
 
+  // ネットワーク復帰時、フォアグラウンドであれば未送信チャンクの再送を自動で試みる
+  window.addEventListener('online', () => {
+    if(sessionActive && !paused) processPendingChunks(true);
+  });
+
   function enterPaused(){
     paused=true;
     clearTimeout(rotateTimer);
@@ -544,13 +552,14 @@
     renderState();
     uiTimer = setInterval(renderState, 500);
     beginChunk();
+    processPendingChunks(true); // 中断中に送れなかったチャンクをまとめて送信する
   };
 
   // MediaRecorderが停止するたびに呼ばれる(15分ローテーション/中断/最終停止のいずれでも共通)
   function handleChunkStopped(){
     const blob = new Blob(chunks,{type:mimeType||'audio/webm'});
     chunks=[];
-    const idx = chunkIndex++;
+    const idx = chunkList.length;
 
     // 唯一のチャンクで、かつ終了操作による停止 → 従来通り「短すぎる録音」エラーとしてセッションを中断
     if(ending && idx===0 && blob.size<2000){
@@ -560,18 +569,23 @@
       return;
     }
 
-    chunkPromises[idx] = transcribeChunk(idx, blob);
+    // 録音データの確保を最優先:送信の成否に関わらず、まず必ず'recorded'として保存する
+    chunkList.push({ idx, blob, status:'recorded', text:null, attempts:0, authError:false });
 
-    if(ending) finalizeSession();
-    else if(!paused) beginChunk();
-    // paused の場合は何もしない(再開ボタンが押されるまで待機)
+    if(ending){
+      finalizeSession();
+    }else if(!paused){
+      beginChunk();
+      processPendingChunks(); // 逐次送信は維持する(録音中は無言でバックグラウンド送信)
+    }
+    // paused の場合は送信を試みない(復帰後・オンライン復帰後にまとめて送る)
   }
 
   function resetState(){ stateEl.textContent='画面に触れて録音を開始'; }
 
   function resetSessionState(){
     sessionActive=false; paused=false; ending=false;
-    chunkIndex=0; chunkPromises=[];
+    chunkList=[];
     mediaRecorder=null; stream=null;
     pauseCardEl.style.display='none';
     consentCheck.checked=false; // 録音1回ごとに同意を取り直す
@@ -591,21 +605,24 @@
   }
 
   // 1チャンク分をWhisperに送信する。直前チャンクの文字起こし末尾をpromptに連結し文脈をつなぐ。
-  async function transcribeChunk(idx, blob){
-    if(blob.size<2000) return ''; // 最終チャンクの端数など、極端に短いものは無視
-    if(blob.size>24*1024*1024){
-      notice('error', `チャンク${idx+1}の録音データが大きすぎます(上限は約25MB)。このチャンクは省略されます。`);
-      return '';
+  // 失敗してもchunkListからは削除せず、'failed'として保持する(最大MAX_RETRY回まで自動リトライ)。
+  async function sendChunk(c){
+    if(c.blob.size<2000){ c.status='done'; c.text=''; return; } // 最終チャンクの端数など、極端に短いものは無視
+    if(c.blob.size>24*1024*1024){
+      c.status='failed'; c.attempts=MAX_RETRY; // リトライしても改善しないため上限扱いにする
+      notice('error', `チャンク${c.idx+1}の録音データが大きすぎます(上限は約25MB)。`);
+      return;
     }
+    c.status='sending';
     const key = localStorage.getItem(KEY);
     let promptText = DICTIONARY_CONFIG.whisperPrompt;
-    if(idx>0){
-      const prevText = await chunkPromises[idx-1];
-      const tail = (prevText||'').slice(-150);
+    if(c.idx>0){
+      const prev = chunkList[c.idx-1];
+      const tail = ((prev && prev.text) || '').slice(-150);
       if(tail) promptText += ' ' + tail;
     }
     const fd = new FormData();
-    fd.append('file', blob, `rec_${idx}.`+ext);
+    fd.append('file', c.blob, `rec_${c.idx}.`+ext);
     fd.append('model','whisper-1');
     fd.append('language','ja');
     fd.append('prompt', promptText);
@@ -614,34 +631,72 @@
         method:'POST', headers:{'Authorization':'Bearer '+key}, body:fd
       });
       if(!res.ok){
-        const msg = res.status===401 ? 'APIキーが正しくないようです。設定から確認してください。'
-                                     : `チャンク${idx+1}の文字起こしに失敗しました(エラー ${res.status})。`;
-        notice('error', msg);
-        return '';
+        const err = new Error('http'+res.status); err.status = res.status; throw err;
       }
       const data = await res.json();
-      return applyExactReplace((data.text||'').trim());
+      c.text = applyExactReplace((data.text||'').trim());
+      c.status = 'done';
+      c.blob = null; // テキスト化できたら音声データは不要なので解放する
     }catch(e){
-      notice('error', `チャンク${idx+1}の送信中に通信エラーが発生しました。`);
-      return '';
+      c.attempts++;
+      if(e && e.status===401) c.authError = true;
+      console.log(`[チャンク${c.idx+1}] 送信失敗(${c.attempts}回目)`, e);
+      if(c.attempts < MAX_RETRY && !paused){
+        await new Promise(r=>setTimeout(r, RETRY_DELAY_MS));
+        await sendChunk(c);
+        return;
+      }
+      c.status = 'failed';
     }
   }
 
-  // 停止操作後、全チャンクの文字起こしを録音順に待ち合わせて連結し、整形AIに渡す
-  async function finalizeSession(){
-    const total = chunkPromises.length;
-    notice('busy', total>1 ? `文字起こし中です…(0/${total}チャンク)` : '文字起こし中です…（録音が長いほど時間がかかります）');
-    const texts=[];
-    for(let i=0;i<total;i++){
-      texts[i] = await chunkPromises[i];
-      if(total>1) notice('busy', `文字起こし中です…(${i+1}/${total}チャンク)`);
+  function doneCount(){ return chunkList.filter(c=>c.status==='done').length; }
+
+  // chunkList内の未送信('recorded')・再送待ち('failed'かつリトライ上限未満)を順番に送信するキュー処理。
+  // 同時に複数箇所から呼ばれても二重実行しないよう、実行中のPromiseを使い回す。
+  function processPendingChunks(verbose){
+    if(queuePromise) return queuePromise;
+    queuePromise = runQueue(!!verbose).finally(()=>{ queuePromise=null; });
+    return queuePromise;
+  }
+  async function runQueue(verbose){
+    for(const c of chunkList){
+      if(c.status==='done' || c.status==='sending') continue;
+      if(c.status==='failed' && c.attempts>=MAX_RETRY) continue; // 自動リトライ上限。手動再送信待ち
+      if(paused) return; // 中断中は録音データ確保を優先し、送信は試みない
+      if(verbose) notice('busy', `未送信のチャンクを送信中…(${doneCount()}/${chunkList.length})`);
+      await sendChunk(c);
+      if(verbose) notice('busy', `未送信のチャンクを送信中…(${doneCount()}/${chunkList.length})`);
     }
-    const raw = texts.filter(t=>t).join('\n') || '（音声を認識できませんでした）';
+  }
+
+  // 停止操作後、残っている未送信・失敗チャンクをすべて送り切ってから、録音順に連結して整形AIに渡す
+  async function finalizeSession(){
+    await processPendingChunks(true);
+    const stillPending = chunkList.filter(c=>c.status!=='done');
+    if(stillPending.length>0){
+      stateEl.textContent = '処理中…';
+      const authFailed = stillPending.some(c=>c.authError);
+      const msg = authFailed
+        ? 'APIキーが正しくないようです。設定(⚙)から確認してください。'
+        : '一部の録音が送信できませんでした。電波の良い場所で「再送信」を押してください。';
+      notice('error', msg + '<br><button id="manualRetryBtn">再送信</button>');
+      $('manualRetryBtn').onclick = manualRetry;
+      return; // 整形には進まない。録音データ(chunkList)は保持したまま
+    }
+    const raw = chunkList.map(c=>c.text).filter(t=>t).join('\n') || '（音声を認識できませんでした）';
     notice('busy','内容を整えています…');
     const key = localStorage.getItem(KEY);
     const formatted = await format(raw, key);
     finish(formatted || raw, raw);
     resetSessionState();
+  }
+
+  // 「再送信」ボタン: 失敗チャンクのリトライ回数をリセットしてもう一度送信を試みる
+  async function manualRetry(){
+    for(const c of chunkList){ if(c.status==='failed') c.attempts=0; }
+    clearNotice();
+    await finalizeSession();
   }
 
   async function format(text, key){
