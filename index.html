@@ -93,6 +93,28 @@
     font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);
     letter-spacing:.08em;
   }
+  .clock.disabled{opacity:.55;}
+
+  /* ---- 同意チェック ---- */
+  .consent{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    margin:14px 4px 0;font-size:12px;color:var(--muted);cursor:pointer;
+    user-select:none;letter-spacing:.02em;
+  }
+  .consent input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
+
+  /* ---- 中断(一時停止)カード ---- */
+  .pause-card{
+    display:none;
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 20px;margin-top:14px;text-align:center;
+  }
+  .pause-card p{font-size:13px;color:var(--muted);line-height:1.8;margin-bottom:14px;}
+  .resume-btn{
+    width:100%;padding:16px 0;border-radius:14px;border:none;
+    background:var(--accent);color:#fff;font-size:15px;font-weight:600;
+    letter-spacing:.04em;cursor:pointer;
+  }
 
   /* ---- 処理中/エラー ---- */
   .notice{
@@ -222,6 +244,16 @@
     </div>
     <div class="state" id="state">画面に触れて録音を開始</div>
   </section>
+
+  <label class="consent" id="consentLabel" for="consentCheck">
+    <input type="checkbox" id="consentCheck">
+    <span>お客様の同意を得ました</span>
+  </label>
+
+  <div class="pause-card" id="pauseCard">
+    <p>通話などで録音が一時停止しました。<br>ここまでの内容は保存済みです。</p>
+    <button class="resume-btn" id="resumeBtn">録音を再開</button>
+  </div>
 
   <div class="notice" id="notice"></div>
 
@@ -378,14 +410,20 @@
         dateEl=$('date'), stateEl=$('state'), sweepEl=$('sweep'),
         noticeEl=$('notice'), historyEl=$('history'), countEl=$('count'),
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
-        toastEl=$('toast');
+        toastEl=$('toast'), consentCheck=$('consentCheck'),
+        pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn');
 
   const R = 101, CIRC = 2 * Math.PI * R;
+  const CHUNK_MS = 15 * 60 * 1000; // 15分ごとにチャンクを確定
 
   let mediaRecorder=null, chunks=[], stream=null;
   let recording=false, startTime=0, uiTimer=null;
   let audioCtx=null, wakeLock=null;
-  let lastBlob=null, lastDuration=0, mimeType='', ext='';
+  let lastDuration=0, mimeType='', ext='';
+
+  // ===== 長時間録音(チャンク分割)のセッション状態 =====
+  let sessionActive=false, paused=false, ending=false;
+  let chunkIndex=0, chunkPromises=[], rotateTimer=null;
 
   // ===== 時計表示 =====
   function pad(n){ return String(n).padStart(2,'0'); }
@@ -418,23 +456,39 @@
 
   // ===== 録音 =====
   async function start(){
+    if(!consentCheck.checked){ toast('お客様の同意確認後に録音を開始してください'); return; }
     if(!localStorage.getItem(KEY)){ openModal(); toast('先にAPIキーを設定してください'); return; }
     try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
     catch(e){ notice('error','マイクを使用できませんでした。設定 → Safari → マイク で許可を確認してください。'); return; }
     clearNotice();
     [mimeType, ext] = pickMime();
-    chunks=[];
-    mediaRecorder = new MediaRecorder(stream, mimeType?{mimeType}:undefined);
-    mediaRecorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
-    mediaRecorder.onstop = onStopped;
-    mediaRecorder.start(1000);
     try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(e){}
 
+    sessionActive=true; paused=false; ending=false;
+    chunkIndex=0; chunkPromises=[];
     recording=true; startTime=Date.now();
     clockCard.classList.add('rec');
     colonEl.classList.remove('blink');   // 録音中はコロンが点滅を止める(操作者だけが分かる合図)
     renderState();
     uiTimer = setInterval(renderState, 500);
+    beginChunk();
+  }
+
+  // 新しいチャンクのMediaRecorderを開始し、15分後の自動確定を予約する
+  function beginChunk(){
+    chunks=[];
+    mediaRecorder = new MediaRecorder(stream, mimeType?{mimeType}:undefined);
+    mediaRecorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
+    mediaRecorder.onstop = handleChunkStopped;
+    mediaRecorder.start(1000);
+    clearTimeout(rotateTimer);
+    rotateTimer = setTimeout(rotateChunk, CHUNK_MS);
+  }
+
+  // 15分経過:録音を途切れさせずにMediaRecorderだけ切り替える(handleChunkStoppedが次チャンクを開始する)
+  function rotateChunk(){
+    if(!sessionActive || paused || ending) return;
+    if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
   }
 
   function renderState(){
@@ -442,29 +496,85 @@
     stateEl.innerHTML = `<span class="live"><span class="pip"></span>記録中</span>　<span class="elapsed">${fmtTime(sec)}</span>`;
   }
 
+  // ユーザーが時計をタップしてセッション全体を終える
   function stop(){
+    ending=true;
+    clearTimeout(rotateTimer);
     lastDuration = Math.floor((Date.now()-startTime)/1000);
     recording=false;
     clearInterval(uiTimer);
-    mediaRecorder.stop();
     if(audioCtx){ audioCtx.close(); audioCtx=null; }
     if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
-    stream.getTracks().forEach(t=>t.stop());
     clockCard.classList.remove('rec');
     colonEl.classList.add('blink');
     sweepEl.style.strokeDasharray = `1 ${CIRC}`;
     stateEl.textContent = '処理中…';
+    if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); }
   }
 
-  async function onStopped(){
+  // ===== 中断対策(バックグラウンド遷移) =====
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden && sessionActive && !paused && !ending) enterPaused();
+  });
+
+  function enterPaused(){
+    paused=true;
+    clearTimeout(rotateTimer);
+    clearInterval(uiTimer);
+    if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+    wakeLock=null; // バックグラウンド遷移で自動解放されるため参照だけリセットする
+    clockCard.classList.remove('rec');
+    stateEl.textContent='一時停止中';
+    pauseCardEl.style.display='block';
+  }
+
+  resumeBtnEl.onclick = async () => {
+    try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+    catch(e){ notice('error','マイクを再度取得できませんでした。設定 → Safari → マイク で許可を確認してください。'); return; }
+    try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(e){}
+    paused=false;
+    pauseCardEl.style.display='none';
+    clockCard.classList.add('rec');
+    colonEl.classList.remove('blink');
+    recording=true;
+    renderState();
+    uiTimer = setInterval(renderState, 500);
+    beginChunk();
+  };
+
+  // MediaRecorderが停止するたびに呼ばれる(15分ローテーション/中断/最終停止のいずれでも共通)
+  function handleChunkStopped(){
     const blob = new Blob(chunks,{type:mimeType||'audio/webm'});
-    lastBlob = blob;
-    if(blob.size<2000){ resetState(); notice('error','録音が短すぎるようです。もう一度お試しください。'); return; }
-    if(blob.size>24*1024*1024){ resetState(); notice('error','録音が長すぎます（上限は約25MB）。分けて録音してください。'); return; }
-    await transcribe(blob);
+    chunks=[];
+    const idx = chunkIndex++;
+
+    // 唯一のチャンクで、かつ終了操作による停止 → 従来通り「短すぎる録音」エラーとしてセッションを中断
+    if(ending && idx===0 && blob.size<2000){
+      resetSessionState();
+      resetState();
+      notice('error','録音が短すぎるようです。もう一度お試しください。');
+      return;
+    }
+
+    chunkPromises[idx] = transcribeChunk(idx, blob);
+
+    if(ending) finalizeSession();
+    else if(!paused) beginChunk();
+    // paused の場合は何もしない(再開ボタンが押されるまで待機)
   }
 
   function resetState(){ stateEl.textContent='画面に触れて録音を開始'; }
+
+  function resetSessionState(){
+    sessionActive=false; paused=false; ending=false;
+    chunkIndex=0; chunkPromises=[];
+    mediaRecorder=null; stream=null;
+    pauseCardEl.style.display='none';
+    consentCheck.checked=false; // 録音1回ごとに同意を取り直す
+    updateConsentUI();
+  }
 
   // ===== 文字起こし(Whisper) → 必要なら整形(Chat) =====
   function applyExactReplace(text){
@@ -478,35 +588,58 @@
     return result;
   }
 
-  async function transcribe(blob){
-    notice('busy','文字起こし中です…（録音が長いほど時間がかかります）');
+  // 1チャンク分をWhisperに送信する。直前チャンクの文字起こし末尾をpromptに連結し文脈をつなぐ。
+  async function transcribeChunk(idx, blob){
+    if(blob.size<2000) return ''; // 最終チャンクの端数など、極端に短いものは無視
+    if(blob.size>24*1024*1024){
+      notice('error', `チャンク${idx+1}の録音データが大きすぎます(上限は約25MB)。このチャンクは省略されます。`);
+      return '';
+    }
     const key = localStorage.getItem(KEY);
+    let promptText = DICTIONARY_CONFIG.whisperPrompt;
+    if(idx>0){
+      const prevText = await chunkPromises[idx-1];
+      const tail = (prevText||'').slice(-150);
+      if(tail) promptText += ' ' + tail;
+    }
     const fd = new FormData();
-    fd.append('file', blob, 'rec.'+ext);
+    fd.append('file', blob, `rec_${idx}.`+ext);
     fd.append('model','whisper-1');
     fd.append('language','ja');
-    fd.append('prompt', DICTIONARY_CONFIG.whisperPrompt);
+    fd.append('prompt', promptText);
     try{
       const res = await fetch('https://api.openai.com/v1/audio/transcriptions',{
         method:'POST', headers:{'Authorization':'Bearer '+key}, body:fd
       });
       if(!res.ok){
         const msg = res.status===401 ? 'APIキーが正しくないようです。設定から確認してください。'
-                                     : `文字起こしに失敗しました（エラー ${res.status}）。`;
-        notice('error', msg+'<br><button id="retryBtn">同じ録音でもう一度試す</button>');
-        $('retryBtn').onclick=()=>transcribe(lastBlob);
-        resetState(); return;
+                                     : `チャンク${idx+1}の文字起こしに失敗しました(エラー ${res.status})。`;
+        notice('error', msg);
+        return '';
       }
       const data = await res.json();
-      const raw = applyExactReplace((data.text||'').trim()) || '（音声を認識できませんでした）';
-      notice('busy','内容を整えています…');
-      const formatted = await format(raw, key);
-      finish(formatted || raw, raw);
+      return applyExactReplace((data.text||'').trim());
     }catch(e){
-      notice('error','通信に失敗しました。電波の良い場所で再送信できます。<br><button id="retryBtn">同じ録音でもう一度試す</button>');
-      $('retryBtn').onclick=()=>transcribe(lastBlob);
-      resetState();
+      notice('error', `チャンク${idx+1}の送信中に通信エラーが発生しました。`);
+      return '';
     }
+  }
+
+  // 停止操作後、全チャンクの文字起こしを録音順に待ち合わせて連結し、整形AIに渡す
+  async function finalizeSession(){
+    const total = chunkPromises.length;
+    notice('busy', total>1 ? `文字起こし中です…(0/${total}チャンク)` : '文字起こし中です…（録音が長いほど時間がかかります）');
+    const texts=[];
+    for(let i=0;i<total;i++){
+      texts[i] = await chunkPromises[i];
+      if(total>1) notice('busy', `文字起こし中です…(${i+1}/${total}チャンク)`);
+    }
+    const raw = texts.filter(t=>t).join('\n') || '（音声を認識できませんでした）';
+    notice('busy','内容を整えています…');
+    const key = localStorage.getItem(KEY);
+    const formatted = await format(raw, key);
+    finish(formatted || raw, raw);
+    resetSessionState();
   }
 
   async function format(text, key){
@@ -532,7 +665,7 @@
 
   function finish(text, raw){
     saveEntry(text, raw, lastDuration);
-    lastBlob=null; clearNotice(); resetState();
+    clearNotice(); resetState();
     toast('記録が完成しました');
   }
 
@@ -629,9 +762,17 @@
   };
 
   // ===== タップで開始/停止(カード全体が対象) =====
-  function toggle(){ recording ? stop() : start(); }
+  function toggle(){
+    if(paused || ending) return; // 一時停止中は専用の再開ボタンのみで再開させる
+    recording ? stop() : start();
+  }
   clockCard.addEventListener('click', toggle);
   clockCard.addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(); } });
+
+  // ===== 同意チェックの見た目連動 =====
+  function updateConsentUI(){ clockCard.classList.toggle('disabled', !consentCheck.checked); }
+  consentCheck.addEventListener('change', updateConsentUI);
+  updateConsentUI();
 
   // ===== 初期化 =====
   renderHistory();
