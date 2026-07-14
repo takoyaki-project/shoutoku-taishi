@@ -834,7 +834,9 @@ REIT=不動産投資信託。読みは「リート」
     }
     const fd = new FormData();
     fd.append('file', c.blob, `rec_${c.idx}.`+ext);
-    fd.append('model','whisper-1');
+    // response_formatは未指定=デフォルトのjsonを使用。gpt-4o-mini-transcribeはjson/textのみ対応
+    // (verbose_json/srt/vttはwhisper-1専用)なので、data.textを読むこの実装のままで互換。
+    fd.append('model','gpt-4o-mini-transcribe');
     fd.append('language','ja');
     fd.append('prompt', promptText);
     try{
