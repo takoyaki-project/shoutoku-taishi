@@ -381,6 +381,10 @@
       'リビング・ニーズ特約、無解約返戻金型、ご意向についてお話しします。',
     // 第1層(whisperPrompt)を文字起こしAPIに送るかどうかのスイッチ。
     // falseでもwhisperPromptの中身自体は保持したまま、送信だけを止める。
+    // 方針: gpt-4o-mini-transcribe使用時は第1層(whisperPrompt)を使わない。
+    // whisper-1と違いgpt-4o系はprompt(単語リスト的な事前ヒント)の効き方が異なり、
+    // 効果検証ができていないため、モデルをgpt-4o-mini-transcribeに切り替えた
+    // タイミングでfalseに固定した(→ model: 'gpt-4o-mini-transcribe' のコメントも参照)。
     useWhisperPrompt: false,
 
     // 【第2層】機械置換テーブル。「誤: 正」。
@@ -844,6 +848,7 @@ REIT=不動産投資信託。読みは「リート」
     fd.append('file', c.blob, `rec_${c.idx}.`+ext);
     // response_formatは未指定=デフォルトのjsonを使用。gpt-4o-mini-transcribeはjson/textのみ対応
     // (verbose_json/srt/vttはwhisper-1専用)なので、data.textを読むこの実装のままで互換。
+    // 第1層(DICTIONARY_CONFIG.whisperPrompt)は使わない方針(useWhisperPrompt=false)。
     fd.append('model','gpt-4o-mini-transcribe');
     fd.append('language','ja');
     if(DICTIONARY_CONFIG.useWhisperPrompt){
