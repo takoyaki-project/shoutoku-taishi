@@ -145,6 +145,8 @@
     font-size:11px;color:var(--muted);margin-bottom:9px;
     font-variant-numeric:tabular-nums;letter-spacing:.04em;
   }
+  .card .meta .meta-right{display:flex;align-items:baseline;gap:7px;}
+  .card .meta .cost{font-size:10px;color:var(--faint);}
   .card .tabs{
     display:flex;gap:6px;margin-bottom:11px;
   }
@@ -279,6 +281,7 @@
     <input class="key" type="password" id="keyInput" placeholder="sk-..." autocomplete="off">
     <label class="fld" for="sendMail">完成後の送信先メール（任意）</label>
     <input type="email" id="sendMail" placeholder="日報の提出先など" autocomplete="off">
+    <p>コストは概算です。正確な請求はOpenAIのダッシュボードをご確認ください。</p>
     <div class="row">
       <button class="btn-cancel" id="cancelBtn">閉じる</button>
       <button class="btn-save" id="saveBtn">保存</button>
@@ -301,6 +304,22 @@
   // ============================================================
   // 設定ゾーン: 配布先ごとにカスタマイズするのはこのブロックだけ
   // ============================================================
+
+  // コスト概算の単価設定。実際の請求額とは異なる概算値であり、変更する場合はここだけ編集する。
+  const COST_CONFIG = {
+    usdJpy: 155, // 円換算レート(固定値。自動取得はしない)
+    transcribeModel: 'gpt-4o-mini-transcribe', // 文字起こしに実際に使うモデル名(sendChunkのmodel指定と共通)
+    chatModel: 'gpt-4o-mini', // 整形AIに実際に使うモデル名(formatのmodel指定と共通)
+    // $/分(文字起こし)。モデルをwhisper-1に戻した場合に備え、使用モデルに応じて単価を切り替える
+    transcribeRatePerMinUSD: {
+      'gpt-4o-mini-transcribe': 0.003,
+      'whisper-1': 0.006,
+    },
+    // $/1Mトークン(整形AI)
+    chatRatePerMTokUSD: {
+      'gpt-4o-mini': { input: 0.15, output: 0.60 },
+    },
+  };
 
   const REPORT_CONFIG = {
     // AIに渡す整形指示。書式や項目を変えたいときはここを編集する。
@@ -849,7 +868,7 @@ REIT=不動産投資信託。読みは「リート」
     // response_formatは未指定=デフォルトのjsonを使用。gpt-4o-mini-transcribeはjson/textのみ対応
     // (verbose_json/srt/vttはwhisper-1専用)なので、data.textを読むこの実装のままで互換。
     // 第1層(DICTIONARY_CONFIG.whisperPrompt)は使わない方針(useWhisperPrompt=false)。
-    fd.append('model','gpt-4o-mini-transcribe');
+    fd.append('model', COST_CONFIG.transcribeModel);
     fd.append('language','ja');
     if(DICTIONARY_CONFIG.useWhisperPrompt){
       let promptText = DICTIONARY_CONFIG.whisperPrompt;
@@ -923,9 +942,24 @@ REIT=不動産投資信託。読みは「リート」
     const raw = chunkList.map(c=>c.text).filter(t=>t).join('\n') || '（音声を認識できませんでした）';
     notice('busy','内容を整えています…');
     const key = localStorage.getItem(KEY);
-    const formatted = await format(raw, key);
-    finish(formatted || raw, raw);
+    const result = await format(raw, key);
+    const costJPY = calcCostJPY(lastDuration, result && result.usage);
+    finish(result ? result.text : null, raw, costJPY);
     resetSessionState();
+  }
+
+  // 録音時間(秒)とchat completionsのusageから、概算コスト(円・整数)を計算する。
+  // 録音時間は一時停止を挟んだセッションでは実際の音声時間よりやや多めに出ることがあるが、
+  // あくまで概算表示のためのものなので、既存のlastDurationをそのまま使う。
+  function calcCostJPY(durationSec, usage){
+    const transcribeRate = COST_CONFIG.transcribeRatePerMinUSD[COST_CONFIG.transcribeModel] || 0;
+    const transcribeUSD = (durationSec/60) * transcribeRate;
+    let chatUSD = 0;
+    const chatRate = COST_CONFIG.chatRatePerMTokUSD[COST_CONFIG.chatModel];
+    if(usage && chatRate){
+      chatUSD = (usage.prompt_tokens||0)/1e6*chatRate.input + (usage.completion_tokens||0)/1e6*chatRate.output;
+    }
+    return Math.round((transcribeUSD + chatUSD) * COST_CONFIG.usdJpy);
   }
 
   // 「再送信」ボタン: 失敗チャンクのリトライ回数をリセットしてもう一度送信を試みる
@@ -943,7 +977,7 @@ REIT=不動産投資信託。読みは「リート」
         method:'POST',
         headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
         body:JSON.stringify({
-          model:'gpt-4o-mini',
+          model: COST_CONFIG.chatModel,
           messages:[{role:'system',content:
             REPORT_CONFIG.systemPrompt +
             '\n' + DICTIONARY_CONFIG.llmGlossary +
@@ -954,24 +988,24 @@ REIT=不動産投資信託。読みは「リート」
       });
       if(!res.ok) return null;
       const d = await res.json();
-      return (d.choices?.[0]?.message?.content||'').trim();
+      return { text: (d.choices?.[0]?.message?.content||'').trim(), usage: d.usage || null };
     }catch(e){ return null; }
   }
 
-  function finish(text, raw){
-    saveEntry(text, raw, lastDuration);
+  function finish(text, raw, costJPY){
+    saveEntry(text || raw, raw, lastDuration, costJPY);
     clearNotice(); resetState();
     toast('記録が完成しました');
   }
 
   // ===== 履歴 =====
   function loadHistory(){ try{return JSON.parse(localStorage.getItem(HIST))||[];}catch(e){return [];} }
-  function saveEntry(text, raw, duration){
+  function saveEntry(text, raw, duration, costJPY){
     const list=loadHistory();
     list.unshift({
       id:Date.now(),
       date:new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
-      duration:fmtTime(duration), text, raw
+      duration:fmtTime(duration), text, raw, costJPY
     });
     localStorage.setItem(HIST, JSON.stringify(list));
     renderHistory();
@@ -982,18 +1016,27 @@ REIT=不動産投資信託。読みは「リート」
   }
   function renderHistory(){
     const list=loadHistory();
-    countEl.textContent = list.length ? `${list.length}件` : '';
     if(!list.length){
+      countEl.textContent = '';
       historyEl.innerHTML='<div class="empty">まだ記録がありません。<br>面談のあとに、ここへ整理された記録が並びます。</div>';
       return;
     }
+    const now = new Date();
+    const monthTotal = list.reduce((sum,e)=>{
+      if(typeof e.costJPY!=='number') return sum;
+      const d = new Date(e.id);
+      const sameMonth = d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+      return sameMonth ? sum+e.costJPY : sum;
+    }, 0);
+    countEl.textContent = `${list.length}件・今月:約${monthTotal.toLocaleString('ja-JP')}円`;
     historyEl.innerHTML='';
     const mail = localStorage.getItem(MAIL)||'';
     for(const e of list){
       const hasRaw = e.raw;
+      const costText = typeof e.costJPY==='number' ? `約${e.costJPY.toLocaleString('ja-JP')}円` : '-';
       const card=document.createElement('div'); card.className='card';
       card.innerHTML=`
-        <div class="meta"><span>${e.date}</span><span>${e.duration}</span></div>
+        <div class="meta"><span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>
         ${hasRaw ? `<div class="tabs">
           <button class="tab-fmt active" data-tab="fmt">商談記録</button>
           <button class="tab-raw" data-tab="raw">話した内容そのまま</button>
