@@ -37,6 +37,7 @@ https://takoyaki-project.github.io/shoutoku-taishi/
 
 	
 ご利用にあたって
+
 録音は必ずお客様の同意を得てから行ってください。
 録音中は画面を表示したままにしてください(自動で画面ロックを防ぎます)。他のアプリに切り替えたり通話が入ったりした場合は、復帰後に「録音を再開」をタップしてください。
 生成される記録はAIによる自動作成です。社内提出前に必ず内容をご確認ください。 特に金額や商品名は、記憶と照らし合わせて確認することをおすすめします。
@@ -68,8 +69,7 @@ TAKOYAKI PROJECT による個人開発です。保険営業の事務作業を間
 
 ご興味をお持ちの方は、ポートフォリオサイトよりお問い合わせください。
 
-<sub>本アプリは個人開発のデモ版です。ご利用は自己責任でお願いいたします。</sub><img width="1730" height="909" alt="thumb-syoutoku-taishi" src="https://github.com/user-attachments/assets/e320f722-ba21-4e54-8648-ff2493acf9cf" />
-
+<sub>本アプリは個人開発のデモ版です。ご利用は自己責任でお願いいたします。</sub>
 🐙 TAKOYAKI PROJECT
 The development never ends.
 
