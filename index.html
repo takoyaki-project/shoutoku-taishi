@@ -247,6 +247,11 @@
   }
   .btn-save{background:var(--accent);color:#fff;font-weight:600;}
   .btn-cancel{background:none;border:1px solid var(--line)!important;color:var(--muted);}
+  .reset-link{
+    display:block;width:100%;margin-top:18px;background:none;border:none;
+    color:#A24736;font-size:11px;text-decoration:underline;text-underline-offset:2px;
+    cursor:pointer;letter-spacing:.02em;text-align:center;
+  }
 
   .toast{
     position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));
@@ -330,6 +335,7 @@
       <button class="btn-cancel" id="cancelBtn">閉じる</button>
       <button class="btn-save" id="saveBtn">保存</button>
     </div>
+    <button class="reset-link" id="resetStuckBtn" type="button">未送信データを削除して初期化</button>
   </div>
 </div>
 
@@ -847,6 +853,19 @@ REIT=不動産投資信託。読みは「リート」
       });
     }catch(e){ console.log('[IndexedDB] セッション削除に失敗', e); }
   }
+  // 「未送信データを削除して初期化」ボタン用:chunks/sessionsストアを丸ごと空にする。
+  // 完了済みの商談記録・メモはlocalStorage(HIST)にのみ保存されIndexedDBには一切書かれないため、
+  // このストアの中身は常に「未処理・未送信のセッション」だけであり、丸ごと削除しても既存の履歴は失われない。
+  async function clearAllPendingSessions(){
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['chunks','sessions'], 'readwrite');
+      tx.objectStore('chunks').clear();
+      tx.objectStore('sessions').clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
 
   // 起動時:未完了セッションが残っていれば復旧バナーを出す
   async function checkForRecovery(){
@@ -1351,6 +1370,26 @@ REIT=不動産投資信託。読みは「リート」
     modalBg.classList.remove('show');
     toast('保存しました');
     renderHistory();
+  };
+  $('resetStuckBtn').onclick = async () => {
+    if(!confirm('送信できていない録音データを削除します。完了済みの記録は残ります。よろしいですか?')) return;
+    try{
+      await clearAllPendingSessions();
+    }catch(e){
+      console.log('[IndexedDB] 未送信データの削除に失敗', e);
+      toast('削除に失敗しました');
+      return;
+    }
+    // 画面に残っている「詰まった」表示・状態もあわせてクリアする
+    awaitingRetry = false;
+    chunkList = []; sessionId = null;
+    sessionActive = false; paused = false; ending = false;
+    clearNotice();
+    recoveryCardEl.style.display = 'none';
+    pauseCardEl.style.display = 'none';
+    resetState();
+    modalBg.classList.remove('show');
+    toast('未送信データを削除しました');
   };
 
   // ===== タップで開始/停止(カード全体が対象) =====
