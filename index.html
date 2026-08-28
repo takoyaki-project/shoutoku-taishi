@@ -79,9 +79,16 @@
   }
 
   /* 時計本体(SVGリング + デジタル表示) */
-  .dial{position:relative;width:214px;height:214px;margin:0 auto 8px;}
+  .dial{
+    position:relative;width:214px;height:214px;margin:0 auto 8px;
+    border-radius:50%;
+    background:var(--accent-soft); /* 録音前だけ淡く塗り、「押せる面」に見せる */
+    transition:background .3s ease;
+  }
+  .clock.rec .dial{background:none;} /* 録音中(黒モード)は塗りなしの従来どおりに戻す */
   .dial svg{position:absolute;inset:0;transform:rotate(-90deg);}
-  .dial .track{fill:none;stroke:var(--line);stroke-width:3;}
+  .dial .track{fill:none;stroke:var(--line);stroke-width:4;}
+  .clock.rec .dial .track{stroke-width:3;} /* 録音中は従来の太さのまま */
   .dial .sweep{
     fill:none;stroke:var(--accent);stroke-width:3;stroke-linecap:round;
     stroke-dasharray:1 999;opacity:0;transition:opacity .5s;
@@ -101,6 +108,12 @@
   @keyframes softblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
   /* 待機中(録音していない)の円:時刻の代わりに「録音開始」を表示するボタンとして機能する */
   .idle-prompt{
+    display:flex;flex-direction:column;align-items:center;gap:10px;
+  }
+  .idle-prompt .record-dot{
+    width:14px;height:14px;border-radius:50%;background:var(--accent);
+  }
+  .idle-prompt .idle-label{
     font-size:22px;font-weight:600;color:var(--accent);letter-spacing:.1em;
   }
   /* 録音終了ラベル。現在時刻より控えめなサイズ(旧.dateと同格)にする */
@@ -321,7 +334,7 @@
         <circle class="sweep" id="sweep" cx="107" cy="107" r="101"></circle>
       </svg>
       <div class="face">
-        <div class="idle-prompt" id="idlePrompt">録音開始</div>
+        <div class="idle-prompt" id="idlePrompt"><span class="record-dot" aria-hidden="true"></span><span class="idle-label">録音開始</span></div>
         <div class="time" id="clock"><span id="hh">--</span><span class="colon blink" id="colon">:</span><span id="mm">--</span></div>
         <div class="stop-label" id="stopLabel">録音終了</div>
       </div>
