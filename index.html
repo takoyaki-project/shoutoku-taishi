@@ -27,6 +27,17 @@
     --accent-soft:#5B7B7722;
     --radius:22px;
   }
+  /* 録音中(フェーズ1)だけ配色を暗くする。電池対策(OLED省電力)目的。要素の増減は行わず配色のみ変更する。 */
+  body.dim-mode{
+    --paper:#050505;
+    --card:#0D0F0E;
+    --ink:#6B706C;
+    --muted:#3E413F;
+    --faint:#2A2C2A;
+    --line:#1B1D1B;
+    --accent:#3F5652;
+    --accent-soft:#3F565222;
+  }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
   body{
@@ -35,6 +46,7 @@
     font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     -webkit-font-smoothing:antialiased;
+    transition:background-color .4s ease, color .4s ease;
   }
   .app{max-width:520px;margin:0 auto;padding:14px 16px 48px;}
 
@@ -241,7 +253,7 @@
   </header>
 
   <div class="pause-card" id="recoveryCard">
-    <p>送信できていない録音があります。<br>再送信して報告書を作成しますか？</p>
+    <p id="recoveryText">送信できていない録音があります。<br>再送信して報告書を作成しますか？</p>
     <button class="resume-btn" id="recoverBtn">再送信</button>
   </div>
 
@@ -672,10 +684,11 @@ REIT=不動産投資信託。読みは「リート」
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
         toastEl=$('toast'), consentCheck=$('consentCheck'),
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
-        recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn');
+        recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn'), recoveryTextEl=$('recoveryText');
 
   const R = 101, CIRC = 2 * Math.PI * R;
-  const CHUNK_MS = 15 * 60 * 1000; // 15分ごとにチャンクを確定
+  const CHUNK_MS = 10 * 60 * 1000; // 10分ごとにチャンクを確定(以前は15分。サイズ超過対策で短縮)
+  const CHUNK_SIZE_SOFT_LIMIT = 20 * 1024 * 1024; // 送信上限(24MB)に達する前に、時間を待たず早めにチャンクを区切る
 
   let mediaRecorder=null, chunks=[], stream=null;
   let recording=false, startTime=0, uiTimer=null;
@@ -685,7 +698,7 @@ REIT=不動産投資信託。読みは「リート」
   // ===== 長時間録音(チャンク分割)のセッション状態 =====
   // 各チャンクは {idx, blob, status:'recorded'|'sending'|'done'|'failed', text, attempts, authError} で保持する。
   // 送信に失敗しても blob は破棄せず、復帰後・オンライン復帰後・停止後にまとめて再送する。
-  let sessionActive=false, paused=false, ending=false;
+  let sessionActive=false, paused=false, ending=false, awaitingRetry=false;
   let chunkList=[], rotateTimer=null, queuePromise=null, sessionId=null;
   const MAX_RETRY = 3, RETRY_DELAY_MS = 4000;
 
@@ -745,13 +758,19 @@ REIT=不動産投資信託。読みは「リート」
       await idbPut('chunks', {
         key: `${sessionId}_${c.idx}`, sessionId, idx: c.idx,
         blob: c.status==='done' ? null : c.blob,
-        status: c.status, text: c.text, attempts: c.attempts, authError: c.authError
+        status: c.status, text: c.text, attempts: c.attempts, authError: c.authError,
+        sizeExceeded: c.sizeExceeded
       });
     }catch(e){ console.log('[IndexedDB] チャンク保存に失敗', e); }
   }
   async function touchSession(){
     try{
-      await idbPut('sessions', { sessionId, startTime, elapsedSec: Math.floor((Date.now()-startTime)/1000) });
+      await idbPut('sessions', {
+        sessionId, startTime, elapsedSec: Math.floor((Date.now()-startTime)/1000),
+        // このチャンク確定の直後に録音を継続したか(true=ローテーション、false=一時停止/終了操作による確定)。
+        // 起動時、trueのまま残っているセッションは「録音継続中に無予告で途切れた」と判断できる。
+        continuingAfter: !paused && !ending
+      });
     }catch(e){ console.log('[IndexedDB] セッション情報の保存に失敗', e); }
   }
   // セッション完了・破棄時に、そのセッションのチャンク・セッションレコードを全削除する
@@ -782,6 +801,10 @@ REIT=不動産投資信託。読みは「リート」
     }catch(e){ console.log('[IndexedDB] 復旧チェックに失敗', e); }
   }
   function showRecoveryBanner(s, storedChunks){
+    // continuingAfterがtrueのまま残っている = 録音継続中に無予告で途切れた(電池切れ等)可能性が高い
+    recoveryTextEl.innerHTML = s.continuingAfter
+      ? '送信できていない録音があります。<br>録音が予期せず終了したため、直前の内容は記録されていない可能性があります。<br>再送信して報告書を作成しますか？'
+      : '送信できていない録音があります。<br>再送信して報告書を作成しますか？';
     recoveryCardEl.style.display = 'block';
     recoverBtnEl.disabled = false;
     recoverBtnEl.onclick = async () => {
@@ -800,7 +823,7 @@ REIT=不動産投資信託。読みは「リート」
       .map(sc => ({
         idx: sc.idx, blob: sc.blob,
         status: sc.status==='done' ? 'done' : 'recorded', // 未完了分はもう一度送信させる
-        text: sc.text, attempts: 0, authError: false
+        text: sc.text, attempts: 0, authError: false, sizeExceeded: false
       }));
     stateEl.textContent = '処理中…';
     await finalizeSession();
@@ -851,23 +874,29 @@ REIT=不動産投資信託。読みは「リート」
     recording=true; startTime=Date.now();
     clockCard.classList.add('rec');
     colonEl.classList.remove('blink');   // 録音中はコロンが点滅を止める(操作者だけが分かる合図)
+    document.body.classList.add('dim-mode'); // 録音中(フェーズ1)は配色を暗くして電池を節約する
     renderState();
     uiTimer = setInterval(renderState, 500);
     beginChunk();
   }
 
-  // 新しいチャンクのMediaRecorderを開始し、15分後の自動確定を予約する
+  // 新しいチャンクのMediaRecorderを開始し、10分後の自動確定を予約する
   function beginChunk(){
     chunks=[];
     mediaRecorder = new MediaRecorder(stream, mimeType?{mimeType}:undefined);
-    mediaRecorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
+    mediaRecorder.ondataavailable = e => {
+      if(e.data.size>0) chunks.push(e.data);
+      // 送信上限(24MB)に達する前に、時間経過を待たず早めにローテーションする(サイズ超過の予防)
+      const total = chunks.reduce((sum,b)=>sum+b.size, 0);
+      if(total>=CHUNK_SIZE_SOFT_LIMIT) rotateChunk();
+    };
     mediaRecorder.onstop = handleChunkStopped;
     mediaRecorder.start(1000);
     clearTimeout(rotateTimer);
     rotateTimer = setTimeout(rotateChunk, CHUNK_MS);
   }
 
-  // 15分経過:録音を途切れさせずにMediaRecorderだけ切り替える(handleChunkStoppedが次チャンクを開始する)
+  // 10分経過、またはサイズ上限接近:録音を途切れさせずにMediaRecorderだけ切り替える(handleChunkStoppedが次チャンクを開始する)
   function rotateChunk(){
     if(!sessionActive || paused || ending) return;
     if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
@@ -889,6 +918,7 @@ REIT=不動産投資信託。読みは「リート」
     if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
     clockCard.classList.remove('rec');
     colonEl.classList.add('blink');
+    document.body.classList.remove('dim-mode'); // フェーズ2(処理中)は通常表示に戻す
     sweepEl.style.strokeDasharray = `1 ${CIRC}`;
     stateEl.textContent = '処理中…';
     if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
@@ -900,9 +930,10 @@ REIT=不動産投資信託。読みは「リート」
     if(document.hidden && sessionActive && !paused && !ending) enterPaused();
   });
 
-  // ネットワーク復帰時、フォアグラウンドであれば未送信チャンクの再送を自動で試みる
+  // ネットワーク復帰時:フェーズ2(送信)で再送信待ちのまま止まっているときだけ自動で再送信を試みる。
+  // 録音中(フェーズ1)は通信しない方針のため、ここでは発火しない。
   window.addEventListener('online', () => {
-    if(sessionActive && !paused) processPendingChunks(true);
+    if(awaitingRetry) manualRetry();
   });
 
   function enterPaused(){
@@ -913,6 +944,7 @@ REIT=不動産投資信託。読みは「リート」
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
     wakeLock=null; // バックグラウンド遷移で自動解放されるため参照だけリセットする
     clockCard.classList.remove('rec');
+    document.body.classList.remove('dim-mode'); // 一時停止中は通常表示に戻す
     stateEl.textContent='一時停止中';
     pauseCardEl.style.display='block';
   }
@@ -925,15 +957,17 @@ REIT=不動産投資信託。読みは「リート」
     pauseCardEl.style.display='none';
     clockCard.classList.add('rec');
     colonEl.classList.remove('blink');
+    document.body.classList.add('dim-mode'); // 録音再開(フェーズ1再開)にあわせて暗表示に戻す
     recording=true;
     renderState();
     uiTimer = setInterval(renderState, 500);
     beginChunk();
-    processPendingChunks(true); // 中断中に送れなかったチャンクをまとめて送信する
+    // 送信はここでは行わない。中断中に確定したチャンクも、停止後のフェーズ2でまとめて送信する。
   };
 
-  // MediaRecorderが停止するたびに呼ばれる(15分ローテーション/中断/最終停止のいずれでも共通)
-  function handleChunkStopped(){
+  // MediaRecorderが停止するたびに呼ばれる(10分ローテーション/中断/最終停止のいずれでも共通)。
+  // ここでは録音データの確定・保存のみを行い、送信は行わない(送信は停止後のfinalizeSessionに集約)。
+  async function handleChunkStopped(){
     const blob = new Blob(chunks,{type:mimeType||'audio/webm'});
     chunks=[];
     const idx = chunkList.length;
@@ -947,18 +981,17 @@ REIT=不動産投資信託。読みは「リート」
     }
 
     // 録音データの確保を最優先:送信の成否に関わらず、まず必ず'recorded'として保存する
-    const c = { idx, blob, status:'recorded', text:null, attempts:0, authError:false };
+    const c = { idx, blob, status:'recorded', text:null, attempts:0, authError:false, sizeExceeded:false };
     chunkList.push(c);
-    persistChunk(c);   // IndexedDBへ保存(録音継続を優先し、完了を待たずに次のチャンクへ進む)
-    touchSession();
 
-    if(ending){
-      finalizeSession();
-    }else if(!paused){
-      beginChunk();
-      processPendingChunks(); // 逐次送信は維持する(録音中は無言でバックグラウンド送信)
-    }
-    // paused の場合は送信を試みない(復帰後・オンライン復帰後にまとめて送る)
+    // 録音を継続する場合は、DB書き込みの完了を待たず先に次のチャンクを開始する(録音の空白を避ける)
+    if(!ending && !paused) beginChunk();
+
+    await persistChunk(c);  // IndexedDBへ保存。ここでawaitし、確定済みチャンクが保存前に失われる窓をなくす
+    await touchSession();
+
+    if(ending) finalizeSession(); // 停止操作のときだけフェーズ2(送信〜要約)へ進む
+    // 録音継続中・一時停止中はここでは送信しない。送信はすべて停止後にまとめて行う。
   }
 
   function resetState(){ stateEl.textContent='画面に触れて録音を開始'; }
@@ -993,8 +1026,8 @@ REIT=不動産投資信託。読みは「リート」
   async function sendChunk(c){
     if(c.blob.size<2000){ c.status='done'; c.text=''; await persistChunk(c); return; } // 最終チャンクの端数など、極端に短いものは無視
     if(c.blob.size>24*1024*1024){
-      c.status='failed'; c.attempts=MAX_RETRY; // リトライしても改善しないため上限扱いにする
-      notice('error', `チャンク${c.idx+1}の録音データが大きすぎます(上限は約25MB)。`);
+      // サイズ超過はリトライしても改善しない(再送信では直らない)。sizeExceededでその旨を区別する。
+      c.status='failed'; c.attempts=MAX_RETRY; c.sizeExceeded=true;
       await persistChunk(c);
       return;
     }
@@ -1064,24 +1097,40 @@ REIT=不動産投資信託。読みは「リート」
 
   // 停止操作後、残っている未送信・失敗チャンクをすべて送り切ってから、録音順に連結して整形AIに渡す
   async function finalizeSession(){
+    awaitingRetry = false;
     await processPendingChunks(true);
-    const stillPending = chunkList.filter(c=>c.status!=='done');
-    if(stillPending.length>0){
+    // サイズ超過(sizeExceeded)は再送信しても直らないため、要約進行のブロック要因から除外する。
+    // それ以外の未完了(ネットワーク/認証エラーなど)だけをブロック要因として扱う。
+    const sizeExceededChunks = chunkList.filter(c=>c.status!=='done' && c.sizeExceeded);
+    const blockingPending = chunkList.filter(c=>c.status!=='done' && !c.sizeExceeded);
+    if(blockingPending.length>0){
+      awaitingRetry = true; // オンライン復帰時に自動再送信の対象とする
       stateEl.textContent = '処理中…';
-      const authFailed = stillPending.some(c=>c.authError);
-      const msg = authFailed
-        ? 'APIキーが正しくないようです。設定(⚙)から確認してください。'
-        : '一部の録音が送信できませんでした。電波の良い場所で「再送信」を押してください。';
+      const authFailed = blockingPending.some(c=>c.authError);
+      let msg;
+      if(authFailed){
+        msg = 'APIキーが正しくないようです。設定(⚙)から確認してください。';
+      }else if(sizeExceededChunks.length>0){
+        msg = '一部の録音は長すぎて送信できません(再送信では直りません)。'
+            + 'それ以外の録音は、電波の良い場所で「再送信」を押すと送信できる場合があります。';
+      }else{
+        msg = '一部の録音が送信できませんでした。電波の良い場所で「再送信」を押してください。';
+      }
       notice('error', msg + '<br><button id="manualRetryBtn">再送信</button>');
       $('manualRetryBtn').onclick = manualRetry;
       return; // 整形には進まない。録音データ(chunkList)は保持したまま
     }
-    const raw = chunkList.map(c=>c.text).filter(t=>t).join('\n') || '（音声を認識できませんでした）';
+    // サイズ超過チャンクだけが残っている場合は、それを諦めて手元にある分だけで要約に進む
+    const raw = chunkList.filter(c=>!c.sizeExceeded).map(c=>c.text).filter(t=>t).join('\n')
+      || '（音声を認識できませんでした）';
     notice('busy','内容を整えています…');
     const key = localStorage.getItem(KEY);
     const result = await format(raw, key);
     const costJPY = calcCostJPY(lastDuration, result && result.usage);
-    finish(result ? result.text : null, raw, costJPY);
+    const sizeWarning = sizeExceededChunks.length>0
+      ? '一部の録音は長すぎて文字起こしできず、この記録には反映されていません。'
+      : null;
+    finish(result ? result.text : null, raw, costJPY, sizeWarning);
     resetSessionState();
   }
 
@@ -1129,9 +1178,10 @@ REIT=不動産投資信託。読みは「リート」
     }catch(e){ return null; }
   }
 
-  function finish(text, raw, costJPY){
+  function finish(text, raw, costJPY, warningMsg){
     saveEntry(text || raw, raw, lastDuration, costJPY);
-    clearNotice(); resetState();
+    if(warningMsg){ notice('error', warningMsg); } else { clearNotice(); }
+    resetState();
     toast('記録が完成しました');
   }
 
