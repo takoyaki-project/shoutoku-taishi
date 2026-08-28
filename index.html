@@ -123,6 +123,19 @@
   }
   .consent input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
 
+  /* ---- 記録モード切替(商談/メモ) ---- */
+  .mode-toggle{
+    display:flex;justify-content:center;gap:6px;
+    margin:12px 4px 0;
+  }
+  .mode-toggle button{
+    background:none;border:1px solid var(--line);color:var(--muted);
+    padding:6px 16px;border-radius:999px;font-size:12px;cursor:pointer;letter-spacing:.04em;
+  }
+  .mode-toggle button.active{
+    background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent);font-weight:600;
+  }
+
   /* ---- 中断(一時停止)カード ---- */
   .pause-card{
     display:none;
@@ -165,8 +178,14 @@
     font-size:11px;color:var(--muted);margin-bottom:9px;
     font-variant-numeric:tabular-nums;letter-spacing:.04em;
   }
+  .card .meta .meta-left{display:flex;align-items:center;gap:7px;}
   .card .meta .meta-right{display:flex;align-items:baseline;gap:7px;}
   .card .meta .cost{font-size:10px;color:var(--faint);}
+  .card .meta .badge{
+    font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;
+    letter-spacing:.04em;background:var(--accent-soft);color:var(--accent);
+  }
+  .card .meta .badge.memo{background:#9AA09C22;color:var(--muted);}
   .card .tabs{
     display:flex;gap:6px;margin-bottom:11px;
   }
@@ -276,6 +295,11 @@
     <input type="checkbox" id="consentCheck">
     <span>お客様の同意を得ました</span>
   </label>
+
+  <div class="mode-toggle" id="modeToggle" role="tablist" aria-label="記録モード">
+    <button type="button" class="mode-btn active" data-mode="business" id="modeBusinessBtn">商談</button>
+    <button type="button" class="mode-btn" data-mode="memo" id="modeMemoBtn">メモ</button>
+  </div>
 
   <div class="pause-card" id="pauseCard">
     <p>通話などで録音が一時停止しました。<br>ここまでの内容は保存済みです。</p>
@@ -677,6 +701,30 @@ REIT=不動産投資信託。読みは「リート」
 退職金規程=役員・従業員の退職金の支給ルールを定めた社内規程。「規定」ではなく「規程」と表記する`,
   };
 
+  // メモモード用の整形プロンプト。商談用の辞書(DICTIONARY_CONFIG)は適用しない。
+  const MEMO_CONFIG = {
+    systemPrompt:
+`## 役割
+提供された録音の文字起こしをもとに、あとで見返して要点が分かるメモを作成してください。
+保険商談とは限らない、日常のさまざまな場面(説明会、集まり、訪問、打ち合わせなど)の記録です。
+
+## フォーマット
+【日時・場所】(話に出れば記載。なければ記載なし)
+【相手・参加者】(誰と話したか、誰が話していたか。なければ記載なし)
+【テーマ】(何についての話か)
+【要点】(話の中身の要点を、自然な文章で。ここを中心に記述する)
+【決まったこと】(結論・合意・決定事項があれば記載。なければ記載なし)
+【持ち帰り・宿題】(次にやること、確認すること、期限があれば記載。なければ記載なし)
+
+## 厳守事項
+- 録音に存在しない情報を創作しない。不明な項目は「(記載なし)」とする。
+- 例え話や仮定の話の内容を、事実として記載しない。
+- 雑談は要点に含めない(ただし場の雰囲気の把握に用いるのはよい)。
+- 数値・固有名詞は、話された通りに記載する。聞き取りが不明瞭なものには「(要確認)」を付す。
+- 短い録音は無理に膨らませず、話された量に応じた自然な長さにする。
+- 検算は内部で行い、出力にはメモ本文のみを記載する。`,
+  };
+
   const $ = id => document.getElementById(id);
   const clockCard=$('clockCard'), hhEl=$('hh'), mmEl=$('mm'), colonEl=$('colon'),
         dateEl=$('date'), stateEl=$('state'), sweepEl=$('sweep'),
@@ -684,7 +732,8 @@ REIT=不動産投資信託。読みは「リート」
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
         toastEl=$('toast'), consentCheck=$('consentCheck'),
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
-        recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn'), recoveryTextEl=$('recoveryText');
+        recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn'), recoveryTextEl=$('recoveryText'),
+        modeBusinessBtn=$('modeBusinessBtn'), modeMemoBtn=$('modeMemoBtn');
 
   const R = 101, CIRC = 2 * Math.PI * R;
   const CHUNK_MS = 10 * 60 * 1000; // 10分ごとにチャンクを確定(以前は15分。サイズ超過対策で短縮)
@@ -699,6 +748,16 @@ REIT=不動産投資信託。読みは「リート」
   // 各チャンクは {idx, blob, status:'recorded'|'sending'|'done'|'failed', text, attempts, authError} で保持する。
   // 送信に失敗しても blob は破棄せず、復帰後・オンライン復帰後・停止後にまとめて再送する。
   let sessionActive=false, paused=false, ending=false, awaitingRetry=false;
+  // recordMode: UIで選択中のモード(常に'business'が初期値)。sessionMode: 録音開始時に確定させ、
+  // セッション中はUI操作の影響を受けない値(録音中/送信中に辞書・プロンプトの適用がぶれないようにする)。
+  let recordMode='business', sessionMode='business';
+  function setMode(mode){
+    recordMode = mode;
+    modeBusinessBtn.classList.toggle('active', mode==='business');
+    modeMemoBtn.classList.toggle('active', mode==='memo');
+  }
+  modeBusinessBtn.onclick = () => setMode('business');
+  modeMemoBtn.onclick = () => setMode('memo');
   let chunkList=[], rotateTimer=null, queuePromise=null, sessionId=null;
   const MAX_RETRY = 3, RETRY_DELAY_MS = 4000;
 
@@ -769,7 +828,8 @@ REIT=不動産投資信託。読みは「リート」
         sessionId, startTime, elapsedSec: Math.floor((Date.now()-startTime)/1000),
         // このチャンク確定の直後に録音を継続したか(true=ローテーション、false=一時停止/終了操作による確定)。
         // 起動時、trueのまま残っているセッションは「録音継続中に無予告で途切れた」と判断できる。
-        continuingAfter: !paused && !ending
+        continuingAfter: !paused && !ending,
+        mode: sessionMode // 復旧時に辞書・プロンプトの適用を誤らないよう、このセッションのモードも保存する
       });
     }catch(e){ console.log('[IndexedDB] セッション情報の保存に失敗', e); }
   }
@@ -817,6 +877,7 @@ REIT=不動産投資信託。読みは「リート」
   async function recoverSession(s, storedChunks){
     sessionId = s.sessionId;
     lastDuration = s.elapsedSec || 0;
+    sessionMode = s.mode || 'business'; // 旧データにmodeが無い場合は商談扱いにする
     chunkList = storedChunks
       .slice()
       .sort((a,b)=>a.idx-b.idx)
@@ -869,6 +930,7 @@ REIT=不動産投資信託。読みは「リート」
     try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(e){}
 
     sessionActive=true; paused=false; ending=false;
+    sessionMode = recordMode; // 以後このセッションが完了するまで、UIでの切替に関わらずこのモードで統一する
     chunkList=[];
     sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
     recording=true; startTime=Date.now();
@@ -1004,6 +1066,7 @@ REIT=不動産投資信託。読みは「リート」
     pauseCardEl.style.display='none';
     consentCheck.checked=false; // 録音1回ごとに同意を取り直す
     updateConsentUI();
+    setMode('business'); // メモモードのまま次の商談を録ってしまう事故を防ぐため、毎回商談に戻す
     if(sidToClean){
       clearSessionFromDB(sidToClean).then(checkForRecovery); // 完了したセッションを片付け、他に残っているものがあれば続けて案内する
     }
@@ -1040,7 +1103,7 @@ REIT=不動産投資信託。読みは「リート」
     // 第1層(DICTIONARY_CONFIG.whisperPrompt)は使わない方針(useWhisperPrompt=false)。
     fd.append('model', COST_CONFIG.transcribeModel);
     fd.append('language','ja');
-    if(DICTIONARY_CONFIG.useWhisperPrompt){
+    if(DICTIONARY_CONFIG.useWhisperPrompt && sessionMode!=='memo'){
       let promptText = DICTIONARY_CONFIG.whisperPrompt;
       if(c.idx>0){
         const prev = chunkList[c.idx-1];
@@ -1057,7 +1120,9 @@ REIT=不動産投資信託。読みは「リート」
         const err = new Error('http'+res.status); err.status = res.status; throw err;
       }
       const data = await res.json();
-      c.text = applyExactReplace((data.text||'').trim());
+      const transcribed = (data.text||'').trim();
+      // メモモードでは保険用語辞書を適用しない(日常会話の誤変換を防ぐ)
+      c.text = sessionMode==='memo' ? transcribed : applyExactReplace(transcribed);
       c.status = 'done';
       await persistChunk(c); // 保存してからメモリ上の音声Blobを解放する
       c.blob = null;
@@ -1125,7 +1190,7 @@ REIT=不動産投資信託。読みは「リート」
       || '（音声を認識できませんでした）';
     notice('busy','内容を整えています…');
     const key = localStorage.getItem(KEY);
-    const result = await format(raw, key);
+    const result = await format(raw, key, sessionMode);
     const costJPY = calcCostJPY(lastDuration, result && result.usage);
     const sizeWarning = sizeExceededChunks.length>0
       ? '一部の録音は長すぎて文字起こしできず、この記録には反映されていません。'
@@ -1157,18 +1222,18 @@ REIT=不動産投資信託。読みは「リート」
     await finalizeSession();
   }
 
-  async function format(text, key){
+  async function format(text, key, mode){
+    // メモモードは商談用フォーマット・辞書を使わず、メモ専用の単体プロンプトのみ渡す
+    const systemPrompt = mode==='memo'
+      ? MEMO_CONFIG.systemPrompt
+      : REPORT_CONFIG.systemPrompt + '\n' + DICTIONARY_CONFIG.llmGlossary + '\n\n' + DICTIONARY_CONFIG.contextNotes;
     try{
       const res = await fetch('https://api.openai.com/v1/chat/completions',{
         method:'POST',
         headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
         body:JSON.stringify({
           model: COST_CONFIG.chatModel,
-          messages:[{role:'system',content:
-            REPORT_CONFIG.systemPrompt +
-            '\n' + DICTIONARY_CONFIG.llmGlossary +
-            '\n\n' + DICTIONARY_CONFIG.contextNotes
-          },{role:'user',content:text}],
+          messages:[{role:'system',content:systemPrompt},{role:'user',content:text}],
           temperature:0.2
         })
       });
@@ -1179,7 +1244,7 @@ REIT=不動産投資信託。読みは「リート」
   }
 
   function finish(text, raw, costJPY, warningMsg){
-    saveEntry(text || raw, raw, lastDuration, costJPY);
+    saveEntry(text || raw, raw, lastDuration, costJPY, sessionMode);
     if(warningMsg){ notice('error', warningMsg); } else { clearNotice(); }
     resetState();
     toast('記録が完成しました');
@@ -1187,12 +1252,12 @@ REIT=不動産投資信託。読みは「リート」
 
   // ===== 履歴 =====
   function loadHistory(){ try{return JSON.parse(localStorage.getItem(HIST))||[];}catch(e){return [];} }
-  function saveEntry(text, raw, duration, costJPY){
+  function saveEntry(text, raw, duration, costJPY, mode){
     const list=loadHistory();
     list.unshift({
       id:Date.now(),
       date:new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
-      duration:fmtTime(duration), text, raw, costJPY
+      duration:fmtTime(duration), text, raw, costJPY, mode:mode||'business'
     });
     localStorage.setItem(HIST, JSON.stringify(list));
     renderHistory();
@@ -1220,12 +1285,14 @@ REIT=不動産投資信託。読みは「リート」
     const mail = localStorage.getItem(MAIL)||'';
     for(const e of list){
       const hasRaw = e.raw;
+      const isMemo = e.mode==='memo';
+      const kindLabel = isMemo ? 'メモ' : '商談記録';
       const costText = typeof e.costJPY==='number' ? `約${e.costJPY.toLocaleString('ja-JP')}円` : '-';
       const card=document.createElement('div'); card.className='card';
       card.innerHTML=`
-        <div class="meta"><span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>
+        <div class="meta"><span class="meta-left"><span class="badge${isMemo?' memo':''}">${kindLabel}</span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>
         ${hasRaw ? `<div class="tabs">
-          <button class="tab-fmt active" data-tab="fmt">商談記録</button>
+          <button class="tab-fmt active" data-tab="fmt">${kindLabel}</button>
           <button class="tab-raw" data-tab="raw">話した内容そのまま</button>
         </div>` : ''}
         <div class="text"></div>
@@ -1256,7 +1323,7 @@ REIT=不動産投資信託。読みは「リート」
       }
       card.querySelector('.copy').onclick=async()=>{ try{await navigator.clipboard.writeText(showingRaw?e.raw:e.text);toast('コピーしました');}catch(err){toast('コピーできませんでした');} };
       card.querySelector('.mail').onclick=()=>{
-        const subject=encodeURIComponent(`商談記録 ${e.date}`);
+        const subject=encodeURIComponent(`${kindLabel} ${e.date}`);
         const body=encodeURIComponent(e.text);
         const to=encodeURIComponent(mail);
         location.href=`mailto:${to}?subject=${subject}&body=${body}`;
