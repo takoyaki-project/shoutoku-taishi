@@ -94,11 +94,22 @@
   .time{
     font-size:52px;font-weight:200;letter-spacing:.02em;
     font-variant-numeric:tabular-nums;line-height:1;
+    display:none;
   }
   .time .colon{transition:opacity .3s;}
   .time .colon.blink{animation:softblink 2s steps(1) infinite;}
   @keyframes softblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
-  .date{font-size:12px;color:var(--muted);margin-top:10px;letter-spacing:.14em;}
+  /* 待機中(録音していない)の円:時刻の代わりに「録音開始」を表示するボタンとして機能する */
+  .idle-prompt{
+    font-size:22px;font-weight:600;color:var(--accent);letter-spacing:.1em;
+  }
+  /* 録音終了ラベル。現在時刻より控えめなサイズ(旧.dateと同格)にする */
+  .stop-label{font-size:12px;color:var(--muted);margin-top:10px;letter-spacing:.14em;display:none;}
+  /* 録音セッション中(一時停止・処理中を含む)は、円の中身を「時刻表示」に切り替える */
+  body.session-live .idle-prompt{display:none;}
+  body.session-live .time{display:block;}
+  /* 「録音終了」は、実際にタップで録音を終えられる状態(一時停止・処理中を除く)だけ表示する */
+  .clock.rec .stop-label{display:block;}
 
   /* 待機/記録の状態表示(ごく控えめ) */
   .state{margin-top:22px;height:22px;font-size:13px;color:var(--muted);letter-spacing:.06em;}
@@ -122,11 +133,15 @@
     user-select:none;letter-spacing:.02em;
   }
   .consent input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
+  .consent input:disabled{cursor:default;opacity:.6;}
 
-  /* ---- 記録モード切替(商談/メモ) ---- */
+  /* ---- 記録モード切替(商談/標準) ---- */
+  .mode-toggle-wrap{margin:16px 4px 18px;text-align:center;}
+  .mode-toggle-label{
+    font-size:11px;color:var(--faint);letter-spacing:.16em;margin-bottom:8px;
+  }
   .mode-toggle{
     display:flex;justify-content:center;gap:6px;
-    margin:12px 4px 0;
   }
   .mode-toggle button{
     background:none;border:1px solid var(--line);color:var(--muted);
@@ -134,6 +149,14 @@
   }
   .mode-toggle button.active{
     background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent);font-weight:600;
+  }
+
+  /* ---- 録音中は「録音専用画面」にする:履歴・料金・議事録形式・同意UIを隠す ---- */
+  body.session-live .consent,
+  body.session-live .mode-toggle-wrap,
+  body.session-live .history-head,
+  body.session-live #history{
+    display:none;
   }
 
   /* ---- 中断(一時停止)カード ---- */
@@ -281,30 +304,34 @@
     <button class="resume-btn" id="recoverBtn">再送信</button>
   </div>
 
+  <label class="consent" id="consentLabel" for="consentCheck">
+    <input type="checkbox" id="consentCheck">
+    <span>お客様の同意を得ました</span>
+  </label>
+
+  <div class="mode-toggle-wrap" id="modeToggleWrap">
+    <div class="mode-toggle-label">議事録形式</div>
+    <div class="mode-toggle" id="modeToggle" role="tablist" aria-label="議事録形式">
+      <button type="button" class="mode-btn active" data-mode="business" id="modeBusinessBtn">商談</button>
+      <button type="button" class="mode-btn" data-mode="memo" id="modeMemoBtn">標準</button>
+    </div>
+  </div>
+
   <!-- 卓上時計風カード:どこをタップしても録音開始/停止 -->
-  <section class="clock" id="clockCard" role="button" tabindex="0" aria-label="タップして録音を開始・停止">
+  <section class="clock" id="clockCard" role="button" tabindex="0" aria-label="タップして録音を開始・終了">
     <div class="dial">
       <svg viewBox="0 0 214 214" aria-hidden="true">
         <circle class="track" cx="107" cy="107" r="101"></circle>
         <circle class="sweep" id="sweep" cx="107" cy="107" r="101"></circle>
       </svg>
       <div class="face">
+        <div class="idle-prompt" id="idlePrompt">録音開始</div>
         <div class="time" id="clock"><span id="hh">--</span><span class="colon blink" id="colon">:</span><span id="mm">--</span></div>
-        <div class="date" id="date"></div>
+        <div class="stop-label" id="stopLabel">録音終了</div>
       </div>
     </div>
-    <div class="state" id="state">画面に触れて録音を開始</div>
+    <div class="state" id="state"></div>
   </section>
-
-  <label class="consent" id="consentLabel" for="consentCheck">
-    <input type="checkbox" id="consentCheck">
-    <span>お客様の同意を得ました</span>
-  </label>
-
-  <div class="mode-toggle" id="modeToggle" role="tablist" aria-label="記録モード">
-    <button type="button" class="mode-btn active" data-mode="business" id="modeBusinessBtn">商談</button>
-    <button type="button" class="mode-btn" data-mode="memo" id="modeMemoBtn">メモ</button>
-  </div>
 
   <div class="pause-card" id="pauseCard">
     <p>通話などで録音が一時停止しました。<br>ここまでの内容は保存済みです。</p>
@@ -733,7 +760,7 @@ REIT=不動産投資信託。読みは「リート」
 
   const $ = id => document.getElementById(id);
   const clockCard=$('clockCard'), hhEl=$('hh'), mmEl=$('mm'), colonEl=$('colon'),
-        dateEl=$('date'), stateEl=$('state'), sweepEl=$('sweep'),
+        stateEl=$('state'), sweepEl=$('sweep'),
         noticeEl=$('notice'), historyEl=$('history'), countEl=$('count'),
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
         toastEl=$('toast'), consentCheck=$('consentCheck'),
@@ -915,7 +942,6 @@ REIT=不動産投資信託。読みは「リート」
     const now = new Date();
     hhEl.textContent = pad(now.getHours());
     mmEl.textContent = pad(now.getMinutes());
-    dateEl.textContent = now.toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'short'});
     // 録音中は秒に応じてリングをゆっくり回す(秒針のように=時計に見える)
     if (recording){
       const sec = now.getSeconds() + now.getMilliseconds()/1000;
@@ -940,7 +966,7 @@ REIT=不動産投資信託。読みは「リート」
 
   // ===== 録音 =====
   async function start(){
-    if(!consentCheck.checked){ toast('お客様の同意確認後に録音を開始してください'); return; }
+    if(!consentCheck.checked){ toast('お客様の同意を確認してください'); return; }
     if(!localStorage.getItem(KEY)){ openModal(); toast('先にAPIキーを設定してください'); return; }
     try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
     catch(e){ notice('error','マイクを使用できませんでした。設定 → Safari → マイク で許可を確認してください。'); return; }
@@ -956,6 +982,8 @@ REIT=不動産投資信託。読みは「リート」
     clockCard.classList.add('rec');
     colonEl.classList.remove('blink');   // 録音中はコロンが点滅を止める(操作者だけが分かる合図)
     document.body.classList.add('dim-mode'); // 録音中(フェーズ1)は配色を暗くして電池を節約する
+    document.body.classList.add('session-live'); // 録音専用画面へ(履歴・議事録形式・同意UIを隠す)
+    consentCheck.disabled = true; // 録音開始後は同意確認を変更できないようにする
     renderState();
     uiTimer = setInterval(renderState, 500);
     beginChunk();
@@ -1075,7 +1103,7 @@ REIT=不動産投資信託。読みは「リート」
     // 録音継続中・一時停止中はここでは送信しない。送信はすべて停止後にまとめて行う。
   }
 
-  function resetState(){ stateEl.textContent='画面に触れて録音を開始'; }
+  function resetState(){ stateEl.textContent=''; } // 円の下の説明文は「録音開始」表示と重複するため出さない
 
   function resetSessionState(){
     const sidToClean = sessionId;
@@ -1083,9 +1111,11 @@ REIT=不動産投資信託。読みは「リート」
     chunkList=[]; sessionId=null;
     mediaRecorder=null; stream=null;
     pauseCardEl.style.display='none';
+    document.body.classList.remove('session-live'); // 録音専用画面を解除し、履歴・議事録形式・同意UIを戻す
     consentCheck.checked=false; // 録音1回ごとに同意を取り直す
+    consentCheck.disabled=false;
     updateConsentUI();
-    setMode('business'); // メモモードのまま次の商談を録ってしまう事故を防ぐため、毎回商談に戻す
+    setMode('business'); // 標準モードのまま次の商談を録ってしまう事故を防ぐため、毎回商談に戻す
     if(sidToClean){
       clearSessionFromDB(sidToClean).then(checkForRecovery); // 完了したセッションを片付け、他に残っているものがあれば続けて案内する
     }
@@ -1305,7 +1335,7 @@ REIT=不動産投資信託。読みは「リート」
     for(const e of list){
       const hasRaw = e.raw;
       const isMemo = e.mode==='memo';
-      const kindLabel = isMemo ? 'メモ' : '商談記録';
+      const kindLabel = isMemo ? '標準記録' : '商談記録';
       const costText = typeof e.costJPY==='number' ? `約${e.costJPY.toLocaleString('ja-JP')}円` : '-';
       const card=document.createElement('div'); card.className='card';
       card.innerHTML=`
@@ -1384,6 +1414,8 @@ REIT=不動産投資信託。読みは「リート」
     awaitingRetry = false;
     chunkList = []; sessionId = null;
     sessionActive = false; paused = false; ending = false;
+    document.body.classList.remove('session-live', 'dim-mode');
+    consentCheck.disabled = false;
     clearNotice();
     recoveryCardEl.style.display = 'none';
     pauseCardEl.style.display = 'none';
