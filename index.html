@@ -135,17 +135,14 @@
   .consent input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
   .consent input:disabled{cursor:default;opacity:.6;}
 
-  /* ---- 記録モード切替(商談/標準) ---- */
-  .mode-toggle-wrap{margin:16px 4px 18px;text-align:center;}
-  .mode-toggle-label{
-    font-size:11px;color:var(--faint);letter-spacing:.16em;margin-bottom:8px;
-  }
+  /* ---- 記録モード切替(商談/標準):同意チェックの直下に控えめに添える ---- */
+  .mode-toggle-wrap{margin:6px 4px 28px;text-align:center;}
   .mode-toggle{
-    display:flex;justify-content:center;gap:6px;
+    display:flex;justify-content:center;gap:4px;
   }
   .mode-toggle button{
     background:none;border:1px solid var(--line);color:var(--muted);
-    padding:6px 16px;border-radius:999px;font-size:12px;cursor:pointer;letter-spacing:.04em;
+    padding:3px 12px;border-radius:999px;font-size:10px;cursor:pointer;letter-spacing:.04em;
   }
   .mode-toggle button.active{
     background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent);font-weight:600;
@@ -310,7 +307,6 @@
   </label>
 
   <div class="mode-toggle-wrap" id="modeToggleWrap">
-    <div class="mode-toggle-label">議事録形式</div>
     <div class="mode-toggle" id="modeToggle" role="tablist" aria-label="議事録形式">
       <button type="button" class="mode-btn active" data-mode="business" id="modeBusinessBtn">商談</button>
       <button type="button" class="mode-btn" data-mode="memo" id="modeMemoBtn">標準</button>
