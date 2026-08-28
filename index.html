@@ -129,20 +129,20 @@
   /* ---- 同意チェック ---- */
   .consent{
     display:flex;align-items:center;justify-content:center;gap:8px;
-    margin:14px 4px 0;font-size:12px;color:var(--muted);cursor:pointer;
+    margin:14px 4px 0;padding:6px 0;font-size:12px;color:var(--muted);cursor:pointer;
     user-select:none;letter-spacing:.02em;
   }
   .consent input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
   .consent input:disabled{cursor:default;opacity:.6;}
 
-  /* ---- 記録モード切替(商談/標準):同意チェックの直下に控えめに添える ---- */
-  .mode-toggle-wrap{margin:6px 4px 28px;text-align:center;}
+  /* ---- 記録モード切替(商談/標準):同意チェックの下に控えめに添える(誤タップ防止に十分な間隔・タップ領域を確保) ---- */
+  .mode-toggle-wrap{margin:12px 4px 28px;text-align:center;}
   .mode-toggle{
-    display:flex;justify-content:center;gap:4px;
+    display:flex;justify-content:center;gap:10px;
   }
   .mode-toggle button{
     background:none;border:1px solid var(--line);color:var(--muted);
-    padding:3px 12px;border-radius:999px;font-size:10px;cursor:pointer;letter-spacing:.04em;
+    padding:9px 18px;border-radius:999px;font-size:11px;cursor:pointer;letter-spacing:.04em;
   }
   .mode-toggle button.active{
     background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent);font-weight:600;
