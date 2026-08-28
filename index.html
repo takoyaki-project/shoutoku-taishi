@@ -83,9 +83,9 @@
   .dial{
     position:relative;width:214px;height:214px;margin:0 auto 8px;
     border-radius:50%;
-    background:linear-gradient(160deg, #FFFFFF 0%, var(--accent-soft) 100%);
-    border:2px solid var(--accent-soft);
-    box-shadow:0 10px 24px rgba(91,123,119,.16), inset 0 2px 3px rgba(255,255,255,.8);
+    background:linear-gradient(160deg, #8CA7A2 0%, var(--accent) 100%);
+    border:3px solid var(--accent);
+    box-shadow:0 10px 24px rgba(91,123,119,.32), inset 0 2px 3px rgba(255,255,255,.5);
     transition:background .3s ease, border-color .3s ease, box-shadow .3s ease;
   }
   .clock.rec .dial{background:none;border:none;box-shadow:none;}
@@ -111,7 +111,7 @@
   @keyframes softblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
   /* 待機中(録音していない)の円:時刻の代わりに「録音開始」を表示するボタンとして機能する */
   .idle-prompt{
-    font-size:22px;font-weight:600;color:var(--accent);letter-spacing:.1em;
+    font-size:22px;font-weight:600;color:#fff;letter-spacing:.1em;
   }
   /* 録音終了ラベル。現在時刻より控えめなサイズ(旧.dateと同格)にする */
   .stop-label{font-size:12px;color:var(--muted);margin-top:10px;letter-spacing:.14em;display:none;}
