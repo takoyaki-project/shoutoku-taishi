@@ -59,7 +59,7 @@ const context = {
 const instrumented = match[1].replace(
   /  \/\/ ===== 初期化 =====[\s\S]*?\}\)\(\);\s*$/,
   `  globalThis.__trimTest = {
-    fmtLongTime, encodeWav, buildSelectedChunks,
+    fmtLongTime, encodeWav, buildSelectedChunks, isRetryableFormatStatus, format,
     setSelection(total, start, end) {
       lastDuration = total; trimStartSec = start; trimEndSec = end;
       trimStartEl.value = String(start); trimEndEl.value = String(end);
@@ -77,6 +77,12 @@ const api = context.__trimTest;
 assert.ok(api, 'test API should be exposed');
 
 assert.equal(api.fmtLongTime(3661), '01:01:01');
+assert.equal(api.isRetryableFormatStatus(0), true);
+assert.equal(api.isRetryableFormatStatus(408), true);
+assert.equal(api.isRetryableFormatStatus(429), true);
+assert.equal(api.isRetryableFormatStatus(500), true);
+assert.equal(api.isRetryableFormatStatus(401), false);
+assert.equal(api.isRetryableFormatStatus(400), false);
 
 const wav = api.encodeWav(new Float32Array([0, 1, -1]), 16000);
 assert.equal(wav.type, 'audio/wav');
@@ -94,6 +100,29 @@ api.setChunks([{
 api.setSelection(2, 0, 2);
 
 (async () => {
+  context.setTimeout = fn => { fn(); return 1; };
+  const responses = [
+    { ok: false, status: 500 },
+    { ok: false, status: 429 },
+    { ok: true, status: 200, json: async () => ({
+      choices: [{ message: { content: '整形済み' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 },
+    }) },
+  ];
+  let fetchCount = 0;
+  context.fetch = async () => responses[fetchCount++];
+  const retryNotices = [];
+  const formatted = await api.format('文字起こし', 'test-key', 'memo', n => retryNotices.push(n));
+  assert.equal(formatted.text, '整形済み');
+  assert.equal(fetchCount, 3);
+  assert.deepEqual(retryNotices, [1, 2]);
+
+  fetchCount = 0;
+  context.fetch = async () => { fetchCount++; return { ok: false, status: 401 }; };
+  const authFailure = await api.format('文字起こし', 'bad-key', 'memo');
+  assert.equal(authFailure.error.status, 401);
+  assert.equal(fetchCount, 1);
+
   const full = await api.buildSelectedChunks();
   assert.equal(full.length, 1);
   assert.equal(full[0].blob, sourceBlob);

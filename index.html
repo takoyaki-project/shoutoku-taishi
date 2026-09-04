@@ -886,6 +886,9 @@ REIT=不動産投資信託。読みは「リート」
   modeMemoBtn.onclick = () => setMode('memo');
   let chunkList=[], rotateTimer=null, queuePromise=null, sessionId=null;
   const MAX_RETRY = 3, RETRY_DELAY_MS = 4000;
+  // 整形AIは、通信断・混雑・サーバー障害だけを自動再試行する（初回＋再試行2回）。
+  // 認証エラーやリクエスト不備は待っても直らないため、すぐ利用者に案内する。
+  const FORMAT_RETRY_DELAYS_MS = [1500, 3000];
 
   // ===== 永続化(IndexedDB) =====
   // 確定したチャンクは音声Blob付きで即座にIndexedDBへ保存し、送信失敗・リロード・
@@ -1644,11 +1647,22 @@ REIT=不動産投資信託。読みは「リート」
       || '（音声を認識できませんでした）';
     notice('busy','内容を整えています…');
     const key = localStorage.getItem(KEY);
-    const result = await format(raw, key, sessionMode);
+    const result = await format(raw, key, sessionMode, retryNo=>{
+      notice('busy', `AIが混み合っています。自動で再試行しています…(${retryNo}/${FORMAT_RETRY_DELAYS_MS.length})`);
+    });
     const costJPY = calcCostJPY(lastDuration, result && result.usage);
     if(!result || !result.text){
-      notice('error','文字起こしは完了しましたが、記録の作成に失敗しました。元音声は端末に残っています。<br><button id="retryFormatBtn">もう一度記録を作成</button>');
-      $('retryFormatBtn').onclick=finalizeSession;
+      const detail = result?.error?.status===401 || result?.error?.status===403
+        ? 'APIキーを確認してから、もう一度お試しください。'
+        : result?.error?.status===429
+          ? 'AIが混み合っています。少し待ってから、もう一度お試しください。'
+          : '通信状況を確認して、もう一度お試しください。';
+      notice('error',`文字起こしは完了しましたが、記録の作成に失敗しました。${detail} 元音声は端末に残っています。<br><button id="retryFormatBtn">もう一度記録を作成</button>`);
+      const retryBtn=$('retryFormatBtn');
+      retryBtn.onclick=()=>{
+        retryBtn.disabled=true; // 二度押しで整形APIを重複実行しない
+        finalizeSession(); // done済みチャンクは再送せず、整形だけをやり直す
+      };
       return;
     }
     pendingCompletion={text:result.text,raw,costJPY};
@@ -1677,25 +1691,44 @@ REIT=不動産投資信託。読みは「リート」
     await finalizeSession();
   }
 
-  async function format(text, key, mode){
+  function isRetryableFormatStatus(status){
+    return status===0 || status===408 || status===429 || status>=500;
+  }
+
+  async function format(text, key, mode, onRetry){
     // メモモードは商談用フォーマット・辞書を使わず、メモ専用の単体プロンプトのみ渡す
     const systemPrompt = mode==='memo'
       ? MEMO_CONFIG.systemPrompt
       : REPORT_CONFIG.systemPrompt + '\n' + DICTIONARY_CONFIG.llmGlossary + '\n\n' + DICTIONARY_CONFIG.contextNotes;
-    try{
-      const res = await fetch('https://api.openai.com/v1/chat/completions',{
-        method:'POST',
-        headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-        body:JSON.stringify({
-          model: COST_CONFIG.chatModel,
-          messages:[{role:'system',content:systemPrompt},{role:'user',content:text}],
-          temperature:0.2
-        })
-      });
-      if(!res.ok) return null;
-      const d = await res.json();
-      return { text: (d.choices?.[0]?.message?.content||'').trim(), usage: d.usage || null };
-    }catch(e){ return null; }
+    for(let attempt=0; attempt<=FORMAT_RETRY_DELAYS_MS.length; attempt++){
+      let status=0;
+      try{
+        const res = await fetch('https://api.openai.com/v1/chat/completions',{
+          method:'POST',
+          headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+          body:JSON.stringify({
+            model: COST_CONFIG.chatModel,
+            messages:[{role:'system',content:systemPrompt},{role:'user',content:text}],
+            temperature:0.2
+          })
+        });
+        status=res.status;
+        if(res.ok){
+          const d = await res.json();
+          const formatted=(d.choices?.[0]?.message?.content||'').trim();
+          if(formatted) return { text:formatted, usage:d.usage||null, error:null };
+          return { text:'', usage:d.usage||null, error:{status, kind:'empty'} };
+        }
+      }catch(e){
+        console.log('[整形AI] 通信エラー', e);
+      }
+      if(!isRetryableFormatStatus(status) || attempt===FORMAT_RETRY_DELAYS_MS.length){
+        return { text:'', usage:null, error:{status, kind:status ? 'http' : 'network'} };
+      }
+      if(onRetry) onRetry(attempt+1);
+      await new Promise(resolve=>setTimeout(resolve, FORMAT_RETRY_DELAYS_MS[attempt]));
+    }
+    return { text:'', usage:null, error:{status:0, kind:'unknown'} };
   }
 
   function finish(text, raw, costJPY){
