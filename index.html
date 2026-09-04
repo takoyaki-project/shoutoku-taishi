@@ -101,39 +101,42 @@
     position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;
   }
+  /* 録音の経過時間(HH:MM:SS)。録音前は時刻の代わりに「録音開始」を表示するボタンとして機能する */
   .time{
     font-size:52px;font-weight:200;letter-spacing:.02em;
     font-variant-numeric:tabular-nums;line-height:1;
     display:none;
   }
-  .time .colon{transition:opacity .3s;}
-  .time .colon.blink{animation:softblink 2s steps(1) infinite;}
-  @keyframes softblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
-  /* 待機中(録音していない)の円:時刻の代わりに「録音開始」を表示するボタンとして機能する */
   .idle-prompt{
     font-size:22px;font-weight:600;color:#fff;letter-spacing:.1em;
   }
-  /* 録音終了ラベル。現在時刻より控えめなサイズ(旧.dateと同格)にする */
-  .stop-label{font-size:12px;color:var(--muted);margin-top:10px;letter-spacing:.14em;display:none;}
-  /* 録音セッション中(一時停止・処理中を含む)は、円の中身を「時刻表示」に切り替える */
+  /* 「録音中」ラベル+インジケータードット。実際に音量に応じてドットが明滅する(改善4)。
+     実際に音を録れている(.clock.rec)ときだけ表示し、一時停止・処理中は表示しない
+     (それらの状態は.state/pause-card側で案内する)。 */
+  .rec-label{
+    display:none;align-items:center;justify-content:center;gap:7px;
+    font-size:12px;color:#fff;letter-spacing:.14em;margin-bottom:8px;
+  }
+  .clock.rec .rec-label{display:flex;}
+  .rec-dot{
+    width:8px;height:8px;border-radius:50%;background:#fff;
+    opacity:0;transform:scale(1);transition:opacity .15s ease, transform .15s ease;
+  }
+  .clock.rec .rec-dot{opacity:.5;}
+  /* 録音セッション中(一時停止・処理中を含む)は、円の中身を「経過時間表示」に切り替える */
   body.session-live .idle-prompt{display:none;}
   body.session-live .time{display:block;}
-  /* 「録音終了」は、実際にタップで録音を終えられる状態(一時停止・処理中を除く)だけ表示する */
-  .clock.rec .stop-label{display:block;}
+
+  /* 独立した終了ボタン(改善3)。実際にタップで録音を終えられる状態(一時停止・処理中を除く)だけ表示する */
+  .end-rec-btn{
+    display:none;width:100%;margin-top:18px;padding:14px 0;border-radius:14px;
+    border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.08);
+    color:#fff;font-size:14px;font-weight:600;letter-spacing:.1em;cursor:pointer;
+  }
+  .clock.rec .end-rec-btn{display:block;}
 
   /* 待機/記録の状態表示(ごく控えめ) */
   .state{margin-top:22px;height:22px;font-size:13px;color:var(--muted);letter-spacing:.06em;}
-  .state .live{color:var(--accent);font-weight:600;}
-  .state .live .pip{
-    display:inline-block;width:6px;height:6px;border-radius:50%;
-    background:var(--accent);margin-right:7px;vertical-align:1px;
-    animation:breathe 2.4s ease-in-out infinite;
-  }
-  @keyframes breathe{0%,100%{opacity:1}50%{opacity:.3}}
-  .elapsed{
-    font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);
-    letter-spacing:.08em;
-  }
   .clock.disabled{opacity:.55;}
 
   /* ---- 同意チェック ---- */
@@ -166,6 +169,26 @@
     display:none;
   }
   body.trim-review .clock,body.trim-review header{display:none;}
+
+  /* ---- 完成直後の結果専用画面(改善1):録音カード等を隠し、完成した記録だけを表示する ---- */
+  body.record-done header,
+  body.record-done .pause-card,
+  body.record-done .consent,
+  body.record-done .mode-toggle-wrap,
+  body.record-done .clock,
+  body.record-done .trim-card,
+  body.record-done .history-head,
+  body.record-done #history{
+    display:none;
+  }
+  .completed-card{display:none;margin-top:8px;}
+  body.record-done .completed-card{display:block;}
+  .completed-card h2{font-size:16px;margin:4px 6px 14px;}
+  .record-close-btn{
+    width:100%;margin-top:12px;padding:15px 0;border-radius:14px;border:none;
+    background:var(--accent);color:#fff;font-size:14px;font-weight:600;
+    letter-spacing:.04em;cursor:pointer;
+  }
 
   /* ---- 録音後の送信範囲確認 ---- */
   .trim-card{
@@ -334,8 +357,7 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
   @media (prefers-reduced-motion:reduce){
-    .time .colon.blink,.state .live .pip{animation:none;}
-    .clock,.toast{transition:none;}
+    .clock,.toast,.rec-dot{transition:none;}
   }
 </style>
 </head>
@@ -364,8 +386,8 @@
     </div>
   </div>
 
-  <!-- 卓上時計風カード:どこをタップしても録音開始/停止 -->
-  <section class="clock" id="clockCard" role="button" tabindex="0" aria-label="タップして録音を開始・終了">
+  <!-- 卓上時計風カード:タップして録音を開始する(停止は下の専用ボタンで行う) -->
+  <section class="clock" id="clockCard" role="button" tabindex="0" aria-label="タップして録音を開始">
     <div class="dial">
       <svg viewBox="0 0 214 214" aria-hidden="true">
         <circle class="track" cx="107" cy="107" r="101"></circle>
@@ -373,11 +395,12 @@
       </svg>
       <div class="face">
         <div class="idle-prompt" id="idlePrompt">録音開始</div>
-        <div class="time" id="clock"><span id="hh">--</span><span class="colon blink" id="colon">:</span><span id="mm">--</span></div>
-        <div class="stop-label" id="stopLabel">録音終了</div>
+        <div class="rec-label" id="recLabel"><span class="rec-dot" id="recDot" aria-hidden="true"></span><span id="recLabelText">録音中</span></div>
+        <div class="time" id="elapsedTime">00:00:00</div>
       </div>
     </div>
     <div class="state" id="state"></div>
+    <button class="end-rec-btn" id="endRecBtn" type="button">録音を終了</button>
   </section>
 
   <section class="trim-card" id="trimCard" aria-labelledby="trimTitle">
@@ -423,6 +446,12 @@
   </div>
 
   <div class="notice" id="notice"></div>
+
+  <!-- 処理完了後、履歴を開かずその場で全文を表示する結果専用画面 -->
+  <section class="completed-card" id="completedCard" aria-labelledby="completedTitle">
+    <h2 id="completedTitle">記録が完成しました</h2>
+    <div id="completedCardBody"></div>
+  </section>
 
   <div class="history-head">
     <h2>記録</h2>
@@ -851,9 +880,11 @@ REIT=不動産投資信託。読みは「リート」
   };
 
   const $ = id => document.getElementById(id);
-  const clockCard=$('clockCard'), hhEl=$('hh'), mmEl=$('mm'), colonEl=$('colon'),
+  const clockCard=$('clockCard'), elapsedTimeEl=$('elapsedTime'),
+        recLabelTextEl=$('recLabelText'), recDotEl=$('recDot'), endRecBtnEl=$('endRecBtn'),
         stateEl=$('state'), sweepEl=$('sweep'),
         noticeEl=$('notice'), historyEl=$('history'), countEl=$('count'),
+        completedCardBodyEl=$('completedCardBody'),
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
         toastEl=$('toast'), consentCheck=$('consentCheck'),
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
@@ -1067,26 +1098,22 @@ REIT=不動産投資信託。読みは「リート」
     if(sessionPhase==='reviewing'){
       await prepareTrimReview(true);
     }else{
+      elapsedTimeEl.textContent = fmtLongTime(lastDuration); // 円に表示する経過時間を、復旧した録音長に合わせておく
       stateEl.textContent = '処理中…';
       await finalizeSession();
     }
   }
 
-  // ===== 時計表示 =====
+  // ===== 円周のリング =====
   function pad(n){ return String(n).padStart(2,'0'); }
-  function updateClock(){
-    const now = new Date();
-    hhEl.textContent = pad(now.getHours());
-    mmEl.textContent = pad(now.getMinutes());
-    // 録音中は秒に応じてリングをゆっくり回す(秒針のように=時計に見える)
-    if (recording){
-      const sec = now.getSeconds() + now.getMilliseconds()/1000;
-      const len = (sec/60) * CIRC;
-      sweepEl.style.strokeDasharray = `${len} ${CIRC}`;
-    }
+  // 録音の経過秒(60秒周期)に応じてリングを回す(=経過時間の「秒針」として機能する)
+  function updateSweep(){
+    if(!recording) return;
+    const sec = totalRecordedSec() % 60;
+    const len = (sec/60) * CIRC;
+    sweepEl.style.strokeDasharray = `${len} ${CIRC}`;
   }
-  setInterval(updateClock, 250);
-  updateClock();
+  setInterval(updateSweep, 250);
 
   // ===== 録音フォーマット判定 =====
   function pickMime(){
@@ -1115,6 +1142,7 @@ REIT=不動産投資信託。読みは「リート」
   function toast(msg){ toastEl.textContent=msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'),1900); }
 
   // トリミング画面の軽量波形用。音声本体とは別に、約4回/秒の音量値だけを保持する。
+  // あわせて、その場の音量で録音インジケータードット(改善4)を明滅させる。
   function startWaveformMonitor(){
     stopWaveformMonitor();
     try{
@@ -1131,7 +1159,10 @@ REIT=不動産投資信託。読みは「リート」
         analyser.getByteTimeDomainData(data);
         let sum=0;
         for(const value of data){ const sample=(value-128)/128; sum+=sample*sample; }
-        waveformSamples.push(Math.min(1,Math.sqrt(sum/data.length)*4));
+        const level = Math.min(1,Math.sqrt(sum/data.length)*4);
+        waveformSamples.push(level);
+        recDotEl.style.opacity = String(0.35+level*0.65);
+        recDotEl.style.transform = `scale(${1+level*0.7})`;
       },250);
     }catch(e){ console.log('[波形] 取得を開始できませんでした',e); }
   }
@@ -1139,6 +1170,7 @@ REIT=不動産投資信託。読みは「リート」
     if(waveformTimer){ clearInterval(waveformTimer); waveformTimer=null; }
     analyser=null;
     if(audioCtx){ audioCtx.close().catch(()=>{}); audioCtx=null; }
+    recDotEl.style.opacity=''; recDotEl.style.transform=''; // CSSの既定(.clock.recのときだけ表示)に戻す
   }
 
   // ===== 録音 =====
@@ -1158,7 +1190,7 @@ REIT=不動産投資信託。読みは「リート」
     sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
     recording=true; startTime=Date.now();
     clockCard.classList.add('rec');
-    colonEl.classList.remove('blink');   // 録音中はコロンが点滅を止める(操作者だけが分かる合図)
+    recLabelTextEl.textContent='録音中';
     document.body.classList.add('dim-mode'); // 録音中(フェーズ1)は配色を暗くして電池を節約する
     document.body.classList.add('session-live'); // 録音専用画面へ(履歴・議事録形式・同意UIを隠す)
     consentCheck.disabled = true; // 録音開始後は同意確認を変更できないようにする
@@ -1197,9 +1229,9 @@ REIT=不動産投資信託。読みは「リート」
     if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
   }
 
+  // 円の中央に経過時間(HH:MM:SS)を表示する。円下の.stateは一時停止中などの短い案内にのみ使う。
   function renderState(){
-    const sec = Math.floor(totalRecordedSec());
-    stateEl.innerHTML = `<span class="live"><span class="pip"></span>記録中</span>　<span class="elapsed">${fmtTime(sec)}</span>`;
+    elapsedTimeEl.textContent = fmtLongTime(totalRecordedSec());
   }
 
   // ユーザーが時計をタップしてセッション全体を終える
@@ -1211,7 +1243,6 @@ REIT=不動産投資信託。読みは「リート」
     stopWaveformMonitor();
     if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
     clockCard.classList.remove('rec');
-    colonEl.classList.add('blink');
     document.body.classList.remove('dim-mode'); // フェーズ2(処理中)は通常表示に戻す
     sweepEl.style.strokeDasharray = `1 ${CIRC}`;
     stateEl.textContent = '処理中…';
@@ -1252,7 +1283,7 @@ REIT=不動産投資信託。読みは「リート」
     paused=false;
     pauseCardEl.style.display='none';
     clockCard.classList.add('rec');
-    colonEl.classList.remove('blink');
+    recLabelTextEl.textContent='録音中';
     document.body.classList.add('dim-mode'); // 録音再開(フェーズ1再開)にあわせて暗表示に戻す
     recording=true;
     beginChunk();
@@ -1519,6 +1550,7 @@ REIT=不動産投資信託。読みは「リート」
       releasePreviewUrls();
       trimCardEl.classList.remove('show');
       document.body.classList.remove('trim-review');
+      elapsedTimeEl.textContent = fmtLongTime(lastDuration); // 円に表示する経過時間を、選択した範囲の長さに合わせておく
       stateEl.textContent='処理中…';
       await finalizeSession();
     }catch(e){
@@ -1771,6 +1803,7 @@ REIT=不動産投資信託。読みは「リート」
     if(sizeWarning){ notice('error', sizeWarning); } else { clearNotice(); }
     resetState();
     toast('記録が完成しました');
+    showCompletedRecord(loadHistory()[0]); // 直前に先頭へ追加したエントリを、その場で全文表示する
     return true;
   }
 
@@ -1808,6 +1841,62 @@ REIT=不動産投資信託。読みは「リート」
     localStorage.setItem(HIST, JSON.stringify(loadHistory().filter(e=>e.id!==id)));
     renderHistory();
   }
+  // 履歴カード・完成直後の結果表示(#completedCard)の両方から使う共通のカード生成。
+  // opts.open: 最初から全文展開(結果画面用)。opts.onDelete: 削除後に呼ぶ追加処理。
+  function buildRecordCard(e, opts={}){
+    const hasRaw = e.raw;
+    const isMemo = e.mode==='memo';
+    const kindLabel = isMemo ? '標準記録' : '商談記録';
+    const costText = typeof e.costJPY==='number' ? `約${e.costJPY.toLocaleString('ja-JP')}円` : '-';
+    const mail = localStorage.getItem(MAIL)||'';
+    const card=document.createElement('div'); card.className='card'+(opts.open?' open':'');
+    card.innerHTML=`
+      <div class="meta"><span class="meta-left"><span class="badge${isMemo?' memo':''}">${kindLabel}</span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>
+      ${hasRaw ? `<div class="tabs">
+        <button class="tab-fmt active" data-tab="fmt">${kindLabel}</button>
+        <button class="tab-raw" data-tab="raw">話した内容そのまま</button>
+      </div>` : ''}
+      <div class="text"></div>
+      <div class="actions">
+        <button class="copy">コピー</button>
+        <button class="primary mail">メールで送る</button>
+        <button class="expand">全文</button>
+        <button class="danger del">削除</button>
+      </div>`;
+    const t=card.querySelector('.text');
+    let showingRaw = false;
+    const renderText = () => {
+      t.textContent = showingRaw ? e.raw : e.text;
+      t.classList.remove('clamped');
+      requestAnimationFrame(()=>{
+        if(t.scrollHeight>t.clientHeight+4 && !card.classList.contains('open')) t.classList.add('clamped');
+      });
+    };
+    renderText();
+    const expandBtn = card.querySelector('.expand');
+    requestAnimationFrame(()=>{
+      if(t.scrollHeight<=t.clientHeight+4) expandBtn.style.display='none';
+    });
+    if(hasRaw){
+      const tabFmt = card.querySelector('.tab-fmt'), tabRaw = card.querySelector('.tab-raw');
+      tabFmt.onclick=()=>{ showingRaw=false; tabFmt.classList.add('active'); tabRaw.classList.remove('active'); renderText(); };
+      tabRaw.onclick=()=>{ showingRaw=true; tabRaw.classList.add('active'); tabFmt.classList.remove('active'); renderText(); };
+    }
+    card.querySelector('.copy').onclick=async()=>{ try{await navigator.clipboard.writeText(showingRaw?e.raw:e.text);toast('コピーしました');}catch(err){toast('コピーできませんでした');} };
+    card.querySelector('.mail').onclick=()=>{
+      const subject=encodeURIComponent(`${kindLabel} ${e.date}`);
+      const body=encodeURIComponent(e.text);
+      const to=encodeURIComponent(mail);
+      location.href=`mailto:${to}?subject=${subject}&body=${body}`;
+    };
+    expandBtn.onclick=ev=>{ card.classList.toggle('open'); ev.target.textContent=card.classList.contains('open')?'閉じる':'全文'; };
+    card.querySelector('.del').onclick=()=>{
+      if(!confirm('この記録を削除しますか?')) return;
+      deleteEntry(e.id);
+      if(opts.onDelete) opts.onDelete();
+    };
+    return card;
+  }
   function renderHistory(){
     const list=loadHistory();
     if(!list.length){
@@ -1824,56 +1913,24 @@ REIT=不動産投資信託。読みは「リート」
     }, 0);
     countEl.textContent = `${list.length}件・今月:約${monthTotal.toLocaleString('ja-JP')}円`;
     historyEl.innerHTML='';
-    const mail = localStorage.getItem(MAIL)||'';
     for(const e of list){
-      const hasRaw = e.raw;
-      const isMemo = e.mode==='memo';
-      const kindLabel = isMemo ? '標準記録' : '商談記録';
-      const costText = typeof e.costJPY==='number' ? `約${e.costJPY.toLocaleString('ja-JP')}円` : '-';
-      const card=document.createElement('div'); card.className='card';
-      card.innerHTML=`
-        <div class="meta"><span class="meta-left"><span class="badge${isMemo?' memo':''}">${kindLabel}</span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>
-        ${hasRaw ? `<div class="tabs">
-          <button class="tab-fmt active" data-tab="fmt">${kindLabel}</button>
-          <button class="tab-raw" data-tab="raw">話した内容そのまま</button>
-        </div>` : ''}
-        <div class="text"></div>
-        <div class="actions">
-          <button class="copy">コピー</button>
-          <button class="primary mail">メールで送る</button>
-          <button class="expand">全文</button>
-          <button class="danger del">削除</button>
-        </div>`;
-      const t=card.querySelector('.text');
-      let showingRaw = false;
-      const renderText = () => {
-        t.textContent = showingRaw ? e.raw : e.text;
-        t.classList.remove('clamped');
-        requestAnimationFrame(()=>{
-          if(t.scrollHeight>t.clientHeight+4 && !card.classList.contains('open')) t.classList.add('clamped');
-        });
-      };
-      renderText();
-      const expandBtn = card.querySelector('.expand');
-      requestAnimationFrame(()=>{
-        if(t.scrollHeight<=t.clientHeight+4) expandBtn.style.display='none';
-      });
-      if(hasRaw){
-        const tabFmt = card.querySelector('.tab-fmt'), tabRaw = card.querySelector('.tab-raw');
-        tabFmt.onclick=()=>{ showingRaw=false; tabFmt.classList.add('active'); tabRaw.classList.remove('active'); renderText(); };
-        tabRaw.onclick=()=>{ showingRaw=true; tabRaw.classList.add('active'); tabFmt.classList.remove('active'); renderText(); };
-      }
-      card.querySelector('.copy').onclick=async()=>{ try{await navigator.clipboard.writeText(showingRaw?e.raw:e.text);toast('コピーしました');}catch(err){toast('コピーできませんでした');} };
-      card.querySelector('.mail').onclick=()=>{
-        const subject=encodeURIComponent(`${kindLabel} ${e.date}`);
-        const body=encodeURIComponent(e.text);
-        const to=encodeURIComponent(mail);
-        location.href=`mailto:${to}?subject=${subject}&body=${body}`;
-      };
-      expandBtn.onclick=ev=>{ card.classList.toggle('open'); ev.target.textContent=card.classList.contains('open')?'閉じる':'全文'; };
-      card.querySelector('.del').onclick=()=>{ if(confirm('この記録を削除しますか?')) deleteEntry(e.id); };
-      historyEl.appendChild(card);
+      historyEl.appendChild(buildRecordCard(e));
     }
+  }
+
+  // 処理完了後、履歴を開かずその場で全文表示する(改善1)。「閉じる」で通常の録音待ち画面に戻る。
+  function showCompletedRecord(entry){
+    if(!entry) return;
+    completedCardBodyEl.innerHTML='';
+    completedCardBodyEl.appendChild(buildRecordCard(entry, {
+      open:true,
+      onDelete:()=>{ document.body.classList.remove('record-done'); }
+    }));
+    const closeBtn=document.createElement('button');
+    closeBtn.className='record-close-btn'; closeBtn.type='button'; closeBtn.textContent='閉じる';
+    closeBtn.onclick=()=>{ document.body.classList.remove('record-done'); };
+    completedCardBodyEl.appendChild(closeBtn);
+    document.body.classList.add('record-done');
   }
 
   // ===== 設定 =====
@@ -1925,13 +1982,14 @@ REIT=不動産投資信託。読みは「リート」
     toast('未送信データを削除しました');
   };
 
-  // ===== タップで開始/停止(カード全体が対象) =====
+  // ===== タップで開始(録音中の終了は誤操作防止のため専用ボタンのみで行う) =====
   function toggle(){
-    if(paused || ending) return; // 一時停止中は専用の再開ボタンのみで再開させる
-    recording ? stop() : start();
+    if(paused || ending || recording) return; // 録音中・一時停止中はカードタップでは何も起きない
+    start();
   }
   clockCard.addEventListener('click', toggle);
   clockCard.addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(); } });
+  endRecBtnEl.addEventListener('click', ()=>{ if(recording) stop(); });
 
   // ===== トリミング画面の操作 =====
   trimStartEl.addEventListener('input',()=>{ stopPreview();updateTrimUI(true,'start'); });
