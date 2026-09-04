@@ -858,7 +858,7 @@ REIT=不動産投資信託。読みは「リート」
         trimFullBtn=$('trimFullBtn'), trimDiscardBtn=$('trimDiscardBtn'), trimAudioEl=$('trimAudio');
 
   const R = 101, CIRC = 2 * Math.PI * R;
-  const CHUNK_MS = 10 * 60 * 1000; // 10分ごとにチャンクを確定(以前は15分。サイズ超過対策で短縮)
+  const CHUNK_MS = 2 * 60 * 1000; // 突然終了時の損失を最大約2分に抑えるため、2分ごとに確定保存する
   const CHUNK_SIZE_SOFT_LIMIT = 20 * 1024 * 1024; // 送信上限(24MB)に達する前に、時間を待たず早めにチャンクを区切る
 
   let mediaRecorder=null, chunks=[], stream=null;
@@ -1155,12 +1155,18 @@ REIT=不動産投資信託。読みは「リート」
     document.body.classList.add('session-live'); // 録音専用画面へ(履歴・議事録形式・同意UIを隠す)
     consentCheck.disabled = true; // 録音開始後は同意確認を変更できないようにする
     beginChunk();
+    // ブラウザが対応していれば、未処理録音が自動削除されにくい永続ストレージを要求する。
+    navigator.storage?.persist?.().catch(()=>{});
+    try{ await touchSession(true); }
+    catch(e){
+      notice('error','録音の保護を開始できませんでした。録音を止めるまで、この画面を閉じないでください。');
+    }
     startWaveformMonitor();
     renderState();
     uiTimer = setInterval(renderState, 500);
   }
 
-  // 新しいチャンクのMediaRecorderを開始し、10分後の自動確定を予約する
+  // 新しいチャンクのMediaRecorderを開始し、2分後の自動確定・端末保存を予約する
   function beginChunk(){
     chunks=[];
     chunkStartedAt=performance.now();
@@ -1288,7 +1294,12 @@ REIT=不動産投資信託。読みは「リート」
       await prepareTrimReview(); // 停止後は必ず範囲確認を挟み、確定するまでAPIへ送らない
       if(!chunkStored) notice('error','録音を端末に保存できませんでした。この画面を閉じずに操作してください。');
     }else{
-      await touchSession();
+      let sessionStored=true;
+      try{ await touchSession(true); }
+      catch(e){ sessionStored=false; }
+      if(!chunkStored || !sessionStored){
+        notice('error','録音を端末に保存できませんでした。録音を止めるまで、この画面を閉じないでください。');
+      }
     }
     // 録音継続中・一時停止中はここでは送信しない。送信はすべて停止後にまとめて行う。
   }
@@ -1929,12 +1940,22 @@ REIT=不動産投資信託。読みは「リート」
   trimDiscardBtn.onclick=async()=>{
     if(!confirm('この録音を削除しますか？削除すると元に戻せません。')) return;
     const sid=sessionId;
-    if(sid) await clearSessionFromDB(sid);
+    if(sid && !(await clearSessionFromDB(sid))){
+      notice('error','録音を削除できませんでした。もう一度お試しください。');
+      return;
+    }
     sessionId=null;
     resetSessionState();
     clearNotice();resetState();toast('録音を削除しました');
   };
   window.addEventListener('resize',()=>{ if(trimCardEl.classList.contains('show')) drawWaveform(); });
+
+  // 録音・編集中・送信中の誤操作によるページ離脱を、ブラウザ標準の確認表示で防ぐ。
+  window.addEventListener('beforeunload',e=>{
+    if(!sessionActive) return;
+    e.preventDefault();
+    e.returnValue='';
+  });
 
   // ===== 同意チェックの見た目連動 =====
   function updateConsentUI(){ clockCard.classList.toggle('disabled', !consentCheck.checked); }

@@ -60,6 +60,7 @@ const instrumented = match[1].replace(
   /  \/\/ ===== 初期化 =====[\s\S]*?\}\)\(\);\s*$/,
   `  globalThis.__trimTest = {
     fmtLongTime, encodeWav, buildSelectedChunks, isRetryableFormatStatus, format,
+    chunkIntervalMs: CHUNK_MS,
     setSelection(total, start, end) {
       lastDuration = total; trimStartSec = start; trimEndSec = end;
       trimStartEl.value = String(start); trimEndEl.value = String(end);
@@ -77,6 +78,7 @@ const api = context.__trimTest;
 assert.ok(api, 'test API should be exposed');
 
 assert.equal(api.fmtLongTime(3661), '01:01:01');
+assert.equal(api.chunkIntervalMs, 2 * 60 * 1000);
 assert.equal(api.isRetryableFormatStatus(0), true);
 assert.equal(api.isRetryableFormatStatus(408), true);
 assert.equal(api.isRetryableFormatStatus(429), true);
