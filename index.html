@@ -1636,8 +1636,10 @@ REIT=不動産投資信託。読みは「リート」
   async function finalizeSession(){
     awaitingRetry = false;
     await processPendingChunks(true);
+    // サイズ超過(sizeExceeded)は再送信しても直らないため、要約進行のブロック要因から除外する。
+    // それ以外の未完了(ネットワーク/認証エラーなど)だけをブロック要因として扱う。
     const sizeExceededChunks = chunkList.filter(c=>c.status!=='done' && c.sizeExceeded);
-    const blockingPending = chunkList.filter(c=>c.status!=='done');
+    const blockingPending = chunkList.filter(c=>c.status!=='done' && !c.sizeExceeded);
     if(blockingPending.length>0){
       awaitingRetry = true; // オンライン復帰時に自動再送信の対象とする
       stateEl.textContent = '処理中…';
@@ -1646,7 +1648,8 @@ REIT=不動産投資信託。読みは「リート」
       if(authFailed){
         msg = 'APIキーが正しくないようです。設定(⚙)から確認してください。';
       }else if(sizeExceededChunks.length>0){
-        msg = '一部の録音が大きすぎて送信できません。元音声は端末に残しています。';
+        msg = '一部の録音は長すぎて送信できません(再送信では直りません)。'
+            + 'それ以外の録音は、電波の良い場所で「再送信」を押すと送信できる場合があります。';
       }else{
         msg = '一部の録音が送信できませんでした。電波の良い場所で「再送信」を押してください。';
       }
@@ -1654,7 +1657,8 @@ REIT=不動産投資信託。読みは「リート」
       $('manualRetryBtn').onclick = manualRetry;
       return; // 整形には進まない。録音データ(chunkList)は保持したまま
     }
-    const raw = chunkList.map(c=>c.text).filter(t=>t).join('\n')
+    // サイズ超過チャンクだけが残っている場合は、それを諦めて手元にある分だけで要約に進む
+    const raw = chunkList.filter(c=>!c.sizeExceeded).map(c=>c.text).filter(t=>t).join('\n')
       || '（音声を認識できませんでした）';
     notice('busy','内容を整えています…');
     const key = localStorage.getItem(KEY);
@@ -1676,8 +1680,11 @@ REIT=不動産投資信託。読みは「リート」
       };
       return;
     }
-    pendingCompletion={text:result.text,raw,costJPY};
-    if(!finish(result.text, raw, costJPY)) return;
+    const sizeWarning = sizeExceededChunks.length>0
+      ? '一部の録音は長すぎて文字起こしできず、この記録には反映されていません。'
+      : null;
+    pendingCompletion={text:result.text,raw,costJPY,sizeWarning};
+    if(!finish(result.text, raw, costJPY, sizeWarning)) return;
     await cleanupAfterSavedRecord(); // 完成記録の保存確認後にだけ元音声を削除する
   }
 
@@ -1742,18 +1749,18 @@ REIT=不動産投資信託。読みは「リート」
     return { text:'', usage:null, error:{status:0, kind:'unknown'} };
   }
 
-  function finish(text, raw, costJPY){
+  function finish(text, raw, costJPY, sizeWarning){
     if(!saveEntry(text, raw, lastDuration, costJPY, sessionMode)){
       notice('error','記録を端末に保存できませんでした。空き容量を確認して、もう一度お試しください。元音声は残っています。<br><button id="retrySaveBtn">もう一度保存</button>');
       $('retrySaveBtn').onclick=async()=>{
         if(!pendingCompletion) return;
-        if(finish(pendingCompletion.text,pendingCompletion.raw,pendingCompletion.costJPY)){
+        if(finish(pendingCompletion.text,pendingCompletion.raw,pendingCompletion.costJPY,pendingCompletion.sizeWarning)){
           await cleanupAfterSavedRecord();
         }
       };
       return false;
     }
-    clearNotice();
+    if(sizeWarning){ notice('error', sizeWarning); } else { clearNotice(); }
     resetState();
     toast('記録が完成しました');
     return true;
