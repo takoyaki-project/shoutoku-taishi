@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="聖徳太子">
@@ -164,6 +164,47 @@
   body.session-live .history-head,
   body.session-live #history{
     display:none;
+  }
+  body.trim-review .clock,body.trim-review header{display:none;}
+
+  /* ---- 録音後の送信範囲確認 ---- */
+  .trim-card{
+    display:none;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:22px 18px;margin-top:8px;
+  }
+  .trim-card.show{display:block;}
+  .trim-card h2{font-size:18px;margin-bottom:8px;}
+  .trim-lead{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:18px;}
+  .wave-wrap{
+    position:relative;height:96px;border-radius:12px;overflow:hidden;
+    background:var(--paper);border:1px solid var(--line);margin-bottom:18px;
+  }
+  .wave-wrap canvas{width:100%;height:100%;display:block;}
+  .trim-field{margin:15px 0;}
+  .trim-field-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .trim-field label{font-size:13px;color:var(--muted);}
+  .trim-time{font-size:18px;font-variant-numeric:tabular-nums;font-weight:600;}
+  .trim-range{width:100%;accent-color:var(--accent);min-height:32px;}
+  .trim-nudge{display:flex;gap:8px;margin-top:7px;}
+  .trim-nudge button{
+    min-height:44px;flex:1;border:1px solid var(--line);border-radius:10px;
+    background:var(--paper);color:var(--ink);font-size:13px;cursor:pointer;
+  }
+  .trim-summary{
+    margin:18px 0 14px;padding:12px 14px;border-radius:12px;
+    background:var(--accent-soft);font-size:13px;color:var(--accent);line-height:1.7;
+  }
+  .trim-preview{
+    width:100%;min-height:48px;border:1px solid var(--accent-soft);border-radius:12px;
+    background:none;color:var(--accent);font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .trim-actions{display:grid;gap:10px;margin-top:14px;}
+  .trim-actions button{min-height:50px;border-radius:13px;font-size:14px;cursor:pointer;}
+  .trim-confirm{border:none;background:var(--accent);color:#fff;font-weight:600;}
+  .trim-full{border:1px solid var(--line);background:none;color:var(--muted);}
+  .trim-discard{
+    min-height:44px!important;border:none!important;background:none!important;
+    color:#A24736;font-size:12px!important;text-decoration:underline;text-underline-offset:3px;
   }
 
   /* ---- 中断(一時停止)カード ---- */
@@ -339,6 +380,43 @@
     <div class="state" id="state"></div>
   </section>
 
+  <section class="trim-card" id="trimCard" aria-labelledby="trimTitle">
+    <h2 id="trimTitle">送信する範囲を確認</h2>
+    <p class="trim-lead">AIに送る範囲を確認してください。前後の不要な音声を除いてから記録を作成できます。</p>
+    <div class="wave-wrap"><canvas id="waveCanvas" aria-label="録音した音声の波形"></canvas></div>
+
+    <div class="trim-field">
+      <div class="trim-field-head">
+        <label for="trimStart">開始位置</label><span class="trim-time" id="trimStartTime">00:00:00</span>
+      </div>
+      <input class="trim-range" id="trimStart" type="range" min="0" max="1" step="1" value="0">
+      <div class="trim-nudge">
+        <button type="button" data-trim="start" data-delta="-1">開始を −1秒</button>
+        <button type="button" data-trim="start" data-delta="1">開始を ＋1秒</button>
+      </div>
+    </div>
+
+    <div class="trim-field">
+      <div class="trim-field-head">
+        <label for="trimEnd">終了位置</label><span class="trim-time" id="trimEndTime">00:00:00</span>
+      </div>
+      <input class="trim-range" id="trimEnd" type="range" min="3" max="3" step="1" value="3">
+      <div class="trim-nudge">
+        <button type="button" data-trim="end" data-delta="-1">終了を −1秒</button>
+        <button type="button" data-trim="end" data-delta="1">終了を ＋1秒</button>
+      </div>
+    </div>
+
+    <div class="trim-summary" id="trimSummary"></div>
+    <audio id="trimAudio" preload="metadata"></audio>
+    <button class="trim-preview" id="trimPreviewBtn" type="button">選択範囲を再生</button>
+    <div class="trim-actions">
+      <button class="trim-confirm" id="trimConfirmBtn" type="button">この範囲で記録を作成</button>
+      <button class="trim-full" id="trimFullBtn" type="button">全範囲を使う</button>
+      <button class="trim-discard" id="trimDiscardBtn" type="button">録音を破棄</button>
+    </div>
+  </section>
+
   <div class="pause-card" id="pauseCard">
     <p>通話などで録音が一時停止しました。<br>ここまでの内容は保存済みです。</p>
     <button class="resume-btn" id="resumeBtn">録音を再開</button>
@@ -358,7 +436,7 @@
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h3>設定</h3>
-    <p>録音した音声は、文字起こしのためOpenAIのAPIに送信されます。文字起こし結果と商談記録、APIキーは、この端末のブラウザ内にのみ保存され、当アプリが独自のサーバーに会話データを保管することはありません。</p>
+    <p>録音後に選択した範囲の音声だけが、文字起こしのためOpenAIのAPIに送信されます。元音声は処理と履歴保存の完了後に自動削除され、失敗時は再試行のため端末内に残ります。文字起こし結果と商談記録、APIキーはこの端末のブラウザ内に保存され、当アプリが独自のサーバーに会話データを保管することはありません。</p>
     <label class="fld" for="keyInput">OpenAI APIキー</label>
     <input class="key" type="password" id="keyInput" placeholder="sk-..." autocomplete="off">
     <label class="fld" for="sendMail">完成後の送信先メール（任意）</label>
@@ -772,7 +850,12 @@ REIT=不動産投資信託。読みは「リート」
         toastEl=$('toast'), consentCheck=$('consentCheck'),
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
         recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn'), recoveryTextEl=$('recoveryText'),
-        modeBusinessBtn=$('modeBusinessBtn'), modeMemoBtn=$('modeMemoBtn');
+        modeBusinessBtn=$('modeBusinessBtn'), modeMemoBtn=$('modeMemoBtn'),
+        trimCardEl=$('trimCard'), waveCanvasEl=$('waveCanvas'),
+        trimStartEl=$('trimStart'), trimEndEl=$('trimEnd'),
+        trimStartTimeEl=$('trimStartTime'), trimEndTimeEl=$('trimEndTime'), trimSummaryEl=$('trimSummary'),
+        trimPreviewBtn=$('trimPreviewBtn'), trimConfirmBtn=$('trimConfirmBtn'),
+        trimFullBtn=$('trimFullBtn'), trimDiscardBtn=$('trimDiscardBtn'), trimAudioEl=$('trimAudio');
 
   const R = 101, CIRC = 2 * Math.PI * R;
   const CHUNK_MS = 10 * 60 * 1000; // 10分ごとにチャンクを確定(以前は15分。サイズ超過対策で短縮)
@@ -780,8 +863,12 @@ REIT=不動産投資信託。読みは「リート」
 
   let mediaRecorder=null, chunks=[], stream=null;
   let recording=false, startTime=0, uiTimer=null;
-  let audioCtx=null, wakeLock=null;
+  let audioCtx=null, analyser=null, waveformTimer=null, wakeLock=null;
   let lastDuration=0, mimeType='', ext='';
+  let chunkStartedAt=0, waveformSamples=[];
+  let sessionPhase='recording', trimStartSec=0, trimEndSec=0;
+  let previewAudio=trimAudioEl, previewChunkIndex=-1, previewUrls=new Map();
+  let pendingCompletion=null;
 
   // ===== 長時間録音(チャンク分割)のセッション状態 =====
   // 各チャンクは {idx, blob, status:'recorded'|'sending'|'done'|'failed', text, attempts, authError} で保持する。
@@ -850,27 +937,36 @@ REIT=不動産投資信託。読みは「リート」
     });
   }
 
-  // チャンク1件を保存(done済みなら容量節約のため音声Blobは保存しない)
-  async function persistChunk(c){
+  // AI処理と履歴保存が完了するまでは、done済みでも元音声Blobを保持する。
+  async function persistChunk(c,strict=false){
     try{
       await idbPut('chunks', {
-        key: `${sessionId}_${c.idx}`, sessionId, idx: c.idx,
-        blob: c.status==='done' ? null : c.blob,
+        key: `${sessionId}_${c.storageKey ?? c.idx}`, sessionId, idx: c.idx,
+        storageKey:c.storageKey, selected:!!c.selected,
+        blob: c.blob, mimeType:c.mimeType, ext:c.ext,
+        startSec:c.startSec, endSec:c.endSec, durationSec:c.durationSec,
         status: c.status, text: c.text, attempts: c.attempts, authError: c.authError,
         sizeExceeded: c.sizeExceeded
       });
-    }catch(e){ console.log('[IndexedDB] チャンク保存に失敗', e); }
+    }catch(e){
+      console.log('[IndexedDB] チャンク保存に失敗', e);
+      if(strict) throw e;
+    }
   }
-  async function touchSession(){
+  async function touchSession(strict=false){
     try{
       await idbPut('sessions', {
-        sessionId, startTime, elapsedSec: Math.floor((Date.now()-startTime)/1000),
+        sessionId, startTime, elapsedSec: totalRecordedSec(),
         // このチャンク確定の直後に録音を継続したか(true=ローテーション、false=一時停止/終了操作による確定)。
         // 起動時、trueのまま残っているセッションは「録音継続中に無予告で途切れた」と判断できる。
-        continuingAfter: !paused && !ending,
-        mode: sessionMode // 復旧時に辞書・プロンプトの適用を誤らないよう、このセッションのモードも保存する
+        continuingAfter: sessionPhase==='recording' && !paused && !ending,
+        mode: sessionMode, // 復旧時に辞書・プロンプトの適用を誤らないよう、このセッションのモードも保存する
+        phase:sessionPhase, trimStartSec, trimEndSec, waveformSamples
       });
-    }catch(e){ console.log('[IndexedDB] セッション情報の保存に失敗', e); }
+    }catch(e){
+      console.log('[IndexedDB] セッション情報の保存に失敗', e);
+      if(strict) throw e;
+    }
   }
   // セッション完了・破棄時に、そのセッションのチャンク・セッションレコードを全削除する
   async function clearSessionFromDB(sid){
@@ -884,7 +980,8 @@ REIT=不動産投資信託。読みは「リート」
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
-    }catch(e){ console.log('[IndexedDB] セッション削除に失敗', e); }
+      return true;
+    }catch(e){ console.log('[IndexedDB] セッション削除に失敗', e); return false; }
   }
   // 「未送信データを削除して初期化」ボタン用:chunks/sessionsストアを丸ごと空にする。
   // 完了済みの商談記録・メモはlocalStorage(HIST)にのみ保存されIndexedDBには一切書かれないため、
@@ -913,10 +1010,16 @@ REIT=不動産投資信託。読みは「リート」
     }catch(e){ console.log('[IndexedDB] 復旧チェックに失敗', e); }
   }
   function showRecoveryBanner(s, storedChunks){
+    if(s.phase==='reviewing'){
+      recoveryTextEl.innerHTML = '確認途中の録音があります。<br>送信範囲の編集を再開しますか？';
+      recoverBtnEl.textContent = '編集を再開';
+    }else{
     // continuingAfterがtrueのまま残っている = 録音継続中に無予告で途切れた(電池切れ等)可能性が高い
-    recoveryTextEl.innerHTML = s.continuingAfter
-      ? '送信できていない録音があります。<br>録音が予期せず終了したため、直前の内容は記録されていない可能性があります。<br>再送信して報告書を作成しますか？'
-      : '送信できていない録音があります。<br>再送信して報告書を作成しますか？';
+      recoveryTextEl.innerHTML = s.continuingAfter
+        ? '送信できていない録音があります。<br>録音が予期せず終了したため、直前の内容は記録されていない可能性があります。<br>再送信して報告書を作成しますか？'
+        : '送信できていない録音があります。<br>再送信して報告書を作成しますか？';
+      recoverBtnEl.textContent = '再送信';
+    }
     recoveryCardEl.style.display = 'block';
     recoverBtnEl.disabled = false;
     recoverBtnEl.onclick = async () => {
@@ -930,16 +1033,32 @@ REIT=不動産投資信託。読みは「リート」
     sessionId = s.sessionId;
     lastDuration = s.elapsedSec || 0;
     sessionMode = s.mode || 'business'; // 旧データにmodeが無い場合は商談扱いにする
-    chunkList = storedChunks
+    sessionPhase = s.phase || 'processing';
+    trimStartSec = Number.isFinite(s.trimStartSec) ? s.trimStartSec : 0;
+    trimEndSec = Number.isFinite(s.trimEndSec) ? s.trimEndSec : lastDuration;
+    waveformSamples = Array.isArray(s.waveformSamples) ? s.waveformSamples : [];
+    const chunksToRecover = sessionPhase==='processing' && storedChunks.some(c=>c.selected)
+      ? storedChunks.filter(c=>c.selected) : storedChunks.filter(c=>!c.selected);
+    chunkList = chunksToRecover
       .slice()
       .sort((a,b)=>a.idx-b.idx)
       .map(sc => ({
-        idx: sc.idx, blob: sc.blob,
+        idx: sc.idx, storageKey:sc.storageKey, selected:!!sc.selected, blob: sc.blob,
+        mimeType:sc.mimeType || sc.blob?.type || 'audio/webm', ext:sc.ext || extensionForMime(sc.mimeType || sc.blob?.type),
+        startSec:Number(sc.startSec)||0, endSec:Number(sc.endSec)||0,
+        durationSec:Number(sc.durationSec)||Math.max(0,(Number(sc.endSec)||0)-(Number(sc.startSec)||0)),
         status: sc.status==='done' ? 'done' : 'recorded', // 未完了分はもう一度送信させる
         text: sc.text, attempts: 0, authError: false, sizeExceeded: false
       }));
-    stateEl.textContent = '処理中…';
-    await finalizeSession();
+    sessionActive = true;
+    ending = true;
+    document.body.classList.add('session-live');
+    if(sessionPhase==='reviewing'){
+      await prepareTrimReview(true);
+    }else{
+      stateEl.textContent = '処理中…';
+      await finalizeSession();
+    }
   }
 
   // ===== 時計表示 =====
@@ -965,10 +1084,51 @@ REIT=不動産投資信託。読みは「リート」
     return ['','webm'];
   }
   function fmtTime(sec){ return `${pad(Math.floor(sec/60))}:${pad(Math.floor(sec%60))}`; }
+  function fmtLongTime(sec){
+    const n=Math.max(0,Math.floor(sec));
+    return `${pad(Math.floor(n/3600))}:${pad(Math.floor((n%3600)/60))}:${pad(n%60)}`;
+  }
+  function extensionForMime(type){
+    if((type||'').includes('mp4')) return 'mp4';
+    if((type||'').includes('wav')) return 'wav';
+    return 'webm';
+  }
+  function completedDurationSec(){ return chunkList.reduce((sum,c)=>sum+(Number(c.durationSec)||0),0); }
+  function totalRecordedSec(){
+    const current = recording && chunkStartedAt ? Math.max(0,(performance.now()-chunkStartedAt)/1000) : 0;
+    return completedDurationSec()+current;
+  }
 
   function notice(type, html){ noticeEl.className='notice '+type; noticeEl.innerHTML=html; }
   function clearNotice(){ noticeEl.className='notice'; noticeEl.innerHTML=''; }
   function toast(msg){ toastEl.textContent=msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'),1900); }
+
+  // トリミング画面の軽量波形用。音声本体とは別に、約4回/秒の音量値だけを保持する。
+  function startWaveformMonitor(){
+    stopWaveformMonitor();
+    try{
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if(!AudioContextClass || !stream) return;
+      audioCtx = new AudioContextClass();
+      const source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.fftSize);
+      waveformTimer = setInterval(()=>{
+        if(!analyser || !recording) return;
+        analyser.getByteTimeDomainData(data);
+        let sum=0;
+        for(const value of data){ const sample=(value-128)/128; sum+=sample*sample; }
+        waveformSamples.push(Math.min(1,Math.sqrt(sum/data.length)*4));
+      },250);
+    }catch(e){ console.log('[波形] 取得を開始できませんでした',e); }
+  }
+  function stopWaveformMonitor(){
+    if(waveformTimer){ clearInterval(waveformTimer); waveformTimer=null; }
+    analyser=null;
+    if(audioCtx){ audioCtx.close().catch(()=>{}); audioCtx=null; }
+  }
 
   // ===== 録音 =====
   async function start(){
@@ -980,9 +1140,10 @@ REIT=不動産投資信託。読みは「リート」
     [mimeType, ext] = pickMime();
     try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(e){}
 
-    sessionActive=true; paused=false; ending=false;
+    sessionActive=true; paused=false; ending=false; sessionPhase='recording';
     sessionMode = recordMode; // 以後このセッションが完了するまで、UIでの切替に関わらずこのモードで統一する
     chunkList=[];
+    waveformSamples=[]; trimStartSec=0; trimEndSec=0;
     sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
     recording=true; startTime=Date.now();
     clockCard.classList.add('rec');
@@ -990,14 +1151,16 @@ REIT=不動産投資信託。読みは「リート」
     document.body.classList.add('dim-mode'); // 録音中(フェーズ1)は配色を暗くして電池を節約する
     document.body.classList.add('session-live'); // 録音専用画面へ(履歴・議事録形式・同意UIを隠す)
     consentCheck.disabled = true; // 録音開始後は同意確認を変更できないようにする
+    beginChunk();
+    startWaveformMonitor();
     renderState();
     uiTimer = setInterval(renderState, 500);
-    beginChunk();
   }
 
   // 新しいチャンクのMediaRecorderを開始し、10分後の自動確定を予約する
   function beginChunk(){
     chunks=[];
+    chunkStartedAt=performance.now();
     mediaRecorder = new MediaRecorder(stream, mimeType?{mimeType}:undefined);
     mediaRecorder.ondataavailable = e => {
       if(e.data.size>0) chunks.push(e.data);
@@ -1018,7 +1181,7 @@ REIT=不動産投資信託。読みは「リート」
   }
 
   function renderState(){
-    const sec = Math.floor((Date.now()-startTime)/1000);
+    const sec = Math.floor(totalRecordedSec());
     stateEl.innerHTML = `<span class="live"><span class="pip"></span>記録中</span>　<span class="elapsed">${fmtTime(sec)}</span>`;
   }
 
@@ -1026,10 +1189,9 @@ REIT=不動産投資信託。読みは「リート」
   function stop(){
     ending=true;
     clearTimeout(rotateTimer);
-    lastDuration = Math.floor((Date.now()-startTime)/1000);
     recording=false;
     clearInterval(uiTimer);
-    if(audioCtx){ audioCtx.close(); audioCtx=null; }
+    stopWaveformMonitor();
     if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
     clockCard.classList.remove('rec');
     colonEl.classList.add('blink');
@@ -1053,8 +1215,10 @@ REIT=不動産投資信託。読みは「リート」
 
   function enterPaused(){
     paused=true;
+    recording=false;
     clearTimeout(rotateTimer);
     clearInterval(uiTimer);
+    stopWaveformMonitor();
     if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
     wakeLock=null; // バックグラウンド遷移で自動解放されるため参照だけリセットする
@@ -1074,9 +1238,10 @@ REIT=不動産投資信託。読みは「リート」
     colonEl.classList.remove('blink');
     document.body.classList.add('dim-mode'); // 録音再開(フェーズ1再開)にあわせて暗表示に戻す
     recording=true;
+    beginChunk();
+    startWaveformMonitor();
     renderState();
     uiTimer = setInterval(renderState, 500);
-    beginChunk();
     // 送信はここでは行わない。中断中に確定したチャンクも、停止後のフェーズ2でまとめて送信する。
   };
 
@@ -1084,6 +1249,7 @@ REIT=不動産投資信託。読みは「リート」
   // ここでは録音データの確定・保存のみを行い、送信は行わない(送信は停止後のfinalizeSessionに集約)。
   async function handleChunkStopped(){
     const blob = new Blob(chunks,{type:mimeType||'audio/webm'});
+    const durationSec = Math.max(0,(performance.now()-chunkStartedAt)/1000);
     chunks=[];
     const idx = chunkList.length;
 
@@ -1096,33 +1262,271 @@ REIT=不動産投資信託。読みは「リート」
     }
 
     // 録音データの確保を最優先:送信の成否に関わらず、まず必ず'recorded'として保存する
-    const c = { idx, blob, status:'recorded', text:null, attempts:0, authError:false, sizeExceeded:false };
+    const startSec = completedDurationSec();
+    const c = {
+      idx, blob, mimeType:mimeType||'audio/webm', ext:ext||extensionForMime(mimeType),
+      startSec, endSec:startSec+durationSec, durationSec,
+      status:'recorded', text:null, attempts:0, authError:false, sizeExceeded:false
+    };
     chunkList.push(c);
 
     // 録音を継続する場合は、DB書き込みの完了を待たず先に次のチャンクを開始する(録音の空白を避ける)
     if(!ending && !paused) beginChunk();
 
-    await persistChunk(c);  // IndexedDBへ保存。ここでawaitし、確定済みチャンクが保存前に失われる窓をなくす
-    await touchSession();
-
-    if(ending) finalizeSession(); // 停止操作のときだけフェーズ2(送信〜要約)へ進む
+    let chunkStored=true;
+    try{ await persistChunk(c,true); }
+    catch(e){ chunkStored=false; }
+    if(ending){
+      sessionPhase='reviewing';
+      trimStartSec=0;
+      trimEndSec=completedDurationSec();
+    }
+    if(ending){
+      await prepareTrimReview(); // 停止後は必ず範囲確認を挟み、確定するまでAPIへ送らない
+      if(!chunkStored) notice('error','録音を端末に保存できませんでした。この画面を閉じずに操作してください。');
+    }else{
+      await touchSession();
+    }
     // 録音継続中・一時停止中はここでは送信しない。送信はすべて停止後にまとめて行う。
+  }
+
+  // ===== 録音後のトリミング確認 =====
+  let trimPersistTimer=null;
+  async function prepareTrimReview(restored=false){
+    lastDuration=completedDurationSec();
+    if(lastDuration<3){
+      resetSessionState();
+      resetState();
+      notice('error','録音が短すぎるようです。もう一度お試しください。');
+      return;
+    }
+    sessionPhase='reviewing';
+    if(!restored){ trimStartSec=0; trimEndSec=lastDuration; }
+    trimStartSec=Math.max(0,Math.min(trimStartSec,lastDuration-3));
+    trimEndSec=Math.max(trimStartSec+3,Math.min(trimEndSec||lastDuration,lastDuration));
+    const max=Math.max(3,Math.ceil(lastDuration));
+    trimStartEl.max=String(max-3);
+    trimEndEl.max=String(max);
+    trimStartEl.value=String(Math.floor(trimStartSec));
+    trimEndEl.value=String(Math.min(max,Math.ceil(trimEndSec)));
+    document.body.classList.remove('dim-mode');
+    document.body.classList.add('session-live','trim-review');
+    trimCardEl.classList.add('show');
+    trimConfirmBtn.disabled=false;trimFullBtn.disabled=false;trimPreviewBtn.disabled=false;
+    pauseCardEl.style.display='none';
+    stateEl.textContent='';
+    clearNotice();
+    updateTrimUI(false);
+    try{ await touchSession(true); }
+    catch(e){ notice('error','編集状態を端末に保存できませんでした。この画面を閉じずに操作してください。'); }
+    requestAnimationFrame(drawWaveform);
+  }
+
+  function normalizeTrimValues(changed){
+    const total=lastDuration;
+    let start=Math.max(0,Math.min(Number(trimStartEl.value)||0,total-3));
+    let end=Math.max(3,Math.min(Number(trimEndEl.value)||total,total));
+    if(end-start<3){
+      if(changed==='start') start=Math.max(0,end-3);
+      else end=Math.min(total,start+3);
+    }
+    trimStartSec=start; trimEndSec=end;
+    trimStartEl.value=String(Math.floor(start));
+    trimEndEl.value=String(Math.ceil(end));
+  }
+
+  function updateTrimUI(persist=true,changed){
+    normalizeTrimValues(changed);
+    trimStartTimeEl.textContent=fmtLongTime(trimStartSec);
+    trimEndTimeEl.textContent=fmtLongTime(trimEndSec);
+    trimStartEl.setAttribute('aria-valuetext',fmtLongTime(trimStartSec));
+    trimEndEl.setAttribute('aria-valuetext',fmtLongTime(trimEndSec));
+    const duration=Math.max(0,trimEndSec-trimStartSec);
+    const cost=calcCostJPY(duration,null);
+    trimSummaryEl.textContent=`使用する長さ ${fmtLongTime(duration)}・文字起こし概算 約${cost.toLocaleString('ja-JP')}円`;
+    drawWaveform();
+    if(persist){
+      clearTimeout(trimPersistTimer);
+      trimPersistTimer=setTimeout(()=>touchSession(),250);
+    }
+  }
+
+  function drawWaveform(){
+    const canvas=waveCanvasEl;
+    const rect=canvas.getBoundingClientRect();
+    if(!rect.width || !rect.height) return;
+    const scale=window.devicePixelRatio||1;
+    canvas.width=Math.round(rect.width*scale); canvas.height=Math.round(rect.height*scale);
+    const ctx=canvas.getContext('2d');
+    if(!ctx) return;
+    const w=canvas.width,h=canvas.height,mid=h/2;
+    ctx.clearRect(0,0,w,h);
+    const samples=waveformSamples.length ? waveformSamples : [0.08];
+    const step=Math.max(1,Math.ceil(samples.length/w));
+    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#5B7B77';
+    ctx.lineWidth=Math.max(1,scale);
+    ctx.beginPath();
+    for(let x=0;x<w;x++){
+      const from=Math.floor(x/w*samples.length),to=Math.min(samples.length,from+step);
+      let peak=.05;
+      for(let i=from;i<to;i++) peak=Math.max(peak,samples[i]||0);
+      const amp=Math.max(1,peak*(h*.42));
+      ctx.moveTo(x,mid-amp);ctx.lineTo(x,mid+amp);
+    }
+    ctx.stroke();
+    ctx.fillStyle='rgba(43,48,46,.35)';
+    const left=w*(trimStartSec/lastDuration),right=w*(trimEndSec/lastDuration);
+    ctx.fillRect(0,0,left,h);ctx.fillRect(right,0,w-right,h);
+  }
+
+  function stopPreview(){
+    previewAudio.pause();
+    previewAudio.onloadedmetadata=null;previewAudio.ontimeupdate=null;previewAudio.onended=null;
+    previewAudio.removeAttribute('src');previewAudio.load();
+    previewChunkIndex=-1;
+    trimPreviewBtn.textContent='選択範囲を再生';
+  }
+  function releasePreviewUrls(){
+    stopPreview();
+    for(const url of previewUrls.values()) URL.revokeObjectURL(url);
+    previewUrls.clear();
+  }
+  function previewUrlFor(c){
+    if(!previewUrls.has(c.idx)) previewUrls.set(c.idx,URL.createObjectURL(c.blob));
+    return previewUrls.get(c.idx);
+  }
+  function playPreviewFrom(globalSec){
+    const index=chunkList.findIndex(c=>globalSec<c.endSec && trimEndSec>c.startSec && c.blob);
+    if(index<0){ stopPreview(); toast('再生できる音声がありません'); return; }
+    stopPreview();
+    const c=chunkList[index];
+    previewChunkIndex=index;
+    const audio=previewAudio;
+    audio.src=previewUrlFor(c);
+    const startAt=Math.max(0,globalSec-c.startSec);
+    audio.onloadedmetadata=()=>{
+      audio.currentTime=Math.min(startAt,Math.max(0,(audio.duration||startAt)-.05));
+      audio.play().then(()=>{trimPreviewBtn.textContent='再生を停止';}).catch(()=>{
+        stopPreview();toast('音声を再生できませんでした');
+      });
+    };
+    audio.ontimeupdate=()=>{
+      const absolute=c.startSec+audio.currentTime;
+      if(absolute>=trimEndSec) stopPreview();
+    };
+    audio.onended=()=>{
+      const next=chunkList.slice(index+1).find(n=>n.startSec<trimEndSec && n.blob);
+      if(next) playPreviewFrom(Math.max(next.startSec,trimStartSec)); else stopPreview();
+    };
+    audio.load();
+  }
+
+  async function trimBlobToWav(blob,startInBlob,endInBlob){
+    const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+    if(!AudioContextClass) throw new Error('audio-context-unavailable');
+    const ctx=new AudioContextClass();
+    try{
+      const buffer=await ctx.decodeAudioData(await blob.arrayBuffer());
+      const from=Math.max(0,Math.floor(startInBlob*buffer.sampleRate));
+      const to=Math.min(buffer.length,Math.ceil(endInBlob*buffer.sampleRate));
+      if(to<=from) throw new Error('empty-trim');
+      const targetRate=16000;
+      const outLength=Math.max(1,Math.floor((to-from)*targetRate/buffer.sampleRate));
+      const mono=new Float32Array(outLength);
+      for(let i=0;i<outLength;i++){
+        const sourcePos=from+i*buffer.sampleRate/targetRate;
+        const lo=Math.floor(sourcePos),hi=Math.min(to-1,lo+1),mix=sourcePos-lo;
+        let sample=0;
+        for(let ch=0;ch<buffer.numberOfChannels;ch++){
+          const data=buffer.getChannelData(ch);
+          sample+=(data[lo]*(1-mix)+data[hi]*mix)/buffer.numberOfChannels;
+        }
+        mono[i]=Math.max(-1,Math.min(1,sample));
+        if(i>0 && i%1000000===0) await new Promise(r=>setTimeout(r,0));
+      }
+      return encodeWav(mono,targetRate);
+    }finally{ await ctx.close().catch(()=>{}); }
+  }
+
+  function encodeWav(samples,sampleRate){
+    const bytes=new ArrayBuffer(44+samples.length*2),view=new DataView(bytes);
+    const write=(offset,value)=>{for(let i=0;i<value.length;i++) view.setUint8(offset+i,value.charCodeAt(i));};
+    write(0,'RIFF');view.setUint32(4,36+samples.length*2,true);write(8,'WAVE');write(12,'fmt ');
+    view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+    view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);
+    view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,samples.length*2,true);
+    let offset=44;
+    for(const sample of samples){ view.setInt16(offset,sample<0?sample*0x8000:sample*0x7fff,true);offset+=2; }
+    return new Blob([bytes],{type:'audio/wav'});
+  }
+
+  async function buildSelectedChunks(){
+    const selected=[];
+    for(const source of chunkList){
+      if(source.endSec<=trimStartSec || source.startSec>=trimEndSec || !source.blob) continue;
+      const localStart=Math.max(0,trimStartSec-source.startSec);
+      const localEnd=Math.min(source.durationSec,trimEndSec-source.startSec);
+      const full=localStart<.05 && localEnd>source.durationSec-.05;
+      const blob=full ? source.blob : await trimBlobToWav(source.blob,localStart,localEnd);
+      const durationSec=Math.max(0,localEnd-localStart),startSec=selected.reduce((s,c)=>s+c.durationSec,0);
+      selected.push({
+        idx:selected.length,storageKey:`trim_${selected.length}`,selected:true,
+        blob,mimeType:full?source.mimeType:'audio/wav',ext:full?source.ext:'wav',
+        startSec,endSec:startSec+durationSec,durationSec,status:'recorded',text:null,
+        attempts:0,authError:false,sizeExceeded:false
+      });
+    }
+    if(!selected.length) throw new Error('empty-selection');
+    return selected;
+  }
+
+  async function confirmTrimAndFinalize(){
+    normalizeTrimValues();
+    if(trimEndSec-trimStartSec<3){ toast('3秒以上の範囲を選んでください');return; }
+    trimConfirmBtn.disabled=true;trimFullBtn.disabled=true;trimPreviewBtn.disabled=true;
+    stopPreview();
+    notice('busy','選択した音声を準備しています…');
+    const originalChunks=chunkList;
+    try{
+      const selected=await buildSelectedChunks();
+      chunkList=selected;
+      lastDuration=completedDurationSec();
+      sessionPhase='processing';
+      for(const c of chunkList) await persistChunk(c,true);
+      await touchSession(true);
+      releasePreviewUrls();
+      trimCardEl.classList.remove('show');
+      document.body.classList.remove('trim-review');
+      stateEl.textContent='処理中…';
+      await finalizeSession();
+    }catch(e){
+      chunkList=originalChunks;sessionPhase='reviewing';
+      console.log('[トリミング] 音声の準備に失敗',e);
+      notice('error','音声を切り出せませんでした。範囲を変えるか、もう一度お試しください。');
+      trimConfirmBtn.disabled=false;trimFullBtn.disabled=false;trimPreviewBtn.disabled=false;
+    }
   }
 
   function resetState(){ stateEl.textContent=''; } // 円の下の説明文は「録音開始」表示と重複するため出さない
 
-  function resetSessionState(){
+  function resetSessionState(skipDbCleanup=false){
     const sidToClean = sessionId;
+    stopWaveformMonitor();
+    releasePreviewUrls();
+    clearTimeout(trimPersistTimer);
     sessionActive=false; paused=false; ending=false;
+    sessionPhase='recording';trimStartSec=0;trimEndSec=0;waveformSamples=[];chunkStartedAt=0;
+    pendingCompletion=null;
     chunkList=[]; sessionId=null;
     mediaRecorder=null; stream=null;
     pauseCardEl.style.display='none';
-    document.body.classList.remove('session-live'); // 録音専用画面を解除し、履歴・議事録形式・同意UIを戻す
+    trimCardEl.classList.remove('show');
+    document.body.classList.remove('session-live','trim-review'); // 録音専用画面を解除し、履歴・議事録形式・同意UIを戻す
     consentCheck.checked=false; // 録音1回ごとに同意を取り直す
     consentCheck.disabled=false;
     updateConsentUI();
     setMode('business'); // 標準モードのまま次の商談を録ってしまう事故を防ぐため、毎回商談に戻す
-    if(sidToClean){
+    if(sidToClean && !skipDbCleanup){
       clearSessionFromDB(sidToClean).then(checkForRecovery); // 完了したセッションを片付け、他に残っているものがあれば続けて案内する
     }
   }
@@ -1152,7 +1556,7 @@ REIT=不動産投資信託。読みは「リート」
     c.status='sending';
     const key = localStorage.getItem(KEY);
     const fd = new FormData();
-    fd.append('file', c.blob, `rec_${c.idx}.`+ext);
+    fd.append('file', c.blob, `rec_${c.idx}.`+(c.ext||extensionForMime(c.mimeType)));
     // response_formatは未指定=デフォルトのjsonを使用。gpt-4o-mini-transcribeはjson/textのみ対応
     // (verbose_json/srt/vttはwhisper-1専用)なので、data.textを読むこの実装のままで互換。
     // 第1層(DICTIONARY_CONFIG.whisperPrompt)は使わない方針(useWhisperPrompt=false)。
@@ -1179,8 +1583,7 @@ REIT=不動産投資信託。読みは「リート」
       // メモモードでは保険用語辞書を適用しない(日常会話の誤変換を防ぐ)
       c.text = sessionMode==='memo' ? transcribed : applyExactReplace(transcribed);
       c.status = 'done';
-      await persistChunk(c); // 保存してからメモリ上の音声Blobを解放する
-      c.blob = null;
+      await persistChunk(c); // AI整形と履歴保存が完了するまでは音声Blobも保持する
     }catch(e){
       c.attempts++;
       if(e && e.status===401) c.authError = true;
@@ -1219,10 +1622,8 @@ REIT=不動産投資信託。読みは「リート」
   async function finalizeSession(){
     awaitingRetry = false;
     await processPendingChunks(true);
-    // サイズ超過(sizeExceeded)は再送信しても直らないため、要約進行のブロック要因から除外する。
-    // それ以外の未完了(ネットワーク/認証エラーなど)だけをブロック要因として扱う。
     const sizeExceededChunks = chunkList.filter(c=>c.status!=='done' && c.sizeExceeded);
-    const blockingPending = chunkList.filter(c=>c.status!=='done' && !c.sizeExceeded);
+    const blockingPending = chunkList.filter(c=>c.status!=='done');
     if(blockingPending.length>0){
       awaitingRetry = true; // オンライン復帰時に自動再送信の対象とする
       stateEl.textContent = '処理中…';
@@ -1231,8 +1632,7 @@ REIT=不動産投資信託。読みは「リート」
       if(authFailed){
         msg = 'APIキーが正しくないようです。設定(⚙)から確認してください。';
       }else if(sizeExceededChunks.length>0){
-        msg = '一部の録音は長すぎて送信できません(再送信では直りません)。'
-            + 'それ以外の録音は、電波の良い場所で「再送信」を押すと送信できる場合があります。';
+        msg = '一部の録音が大きすぎて送信できません。元音声は端末に残しています。';
       }else{
         msg = '一部の録音が送信できませんでした。電波の良い場所で「再送信」を押してください。';
       }
@@ -1240,23 +1640,23 @@ REIT=不動産投資信託。読みは「リート」
       $('manualRetryBtn').onclick = manualRetry;
       return; // 整形には進まない。録音データ(chunkList)は保持したまま
     }
-    // サイズ超過チャンクだけが残っている場合は、それを諦めて手元にある分だけで要約に進む
-    const raw = chunkList.filter(c=>!c.sizeExceeded).map(c=>c.text).filter(t=>t).join('\n')
+    const raw = chunkList.map(c=>c.text).filter(t=>t).join('\n')
       || '（音声を認識できませんでした）';
     notice('busy','内容を整えています…');
     const key = localStorage.getItem(KEY);
     const result = await format(raw, key, sessionMode);
     const costJPY = calcCostJPY(lastDuration, result && result.usage);
-    const sizeWarning = sizeExceededChunks.length>0
-      ? '一部の録音は長すぎて文字起こしできず、この記録には反映されていません。'
-      : null;
-    finish(result ? result.text : null, raw, costJPY, sizeWarning);
-    resetSessionState();
+    if(!result || !result.text){
+      notice('error','文字起こしは完了しましたが、記録の作成に失敗しました。元音声は端末に残っています。<br><button id="retryFormatBtn">もう一度記録を作成</button>');
+      $('retryFormatBtn').onclick=finalizeSession;
+      return;
+    }
+    pendingCompletion={text:result.text,raw,costJPY};
+    if(!finish(result.text, raw, costJPY)) return;
+    await cleanupAfterSavedRecord(); // 完成記録の保存確認後にだけ元音声を削除する
   }
 
-  // 録音時間(秒)とchat completionsのusageから、概算コスト(円・整数)を計算する。
-  // 録音時間は一時停止を挟んだセッションでは実際の音声時間よりやや多めに出ることがあるが、
-  // あくまで概算表示のためのものなので、既存のlastDurationをそのまま使う。
+  // トリミング後の実録音時間(秒)とchat completionsのusageから、概算コスト(円・整数)を計算する。
   function calcCostJPY(durationSec, usage){
     const transcribeRate = COST_CONFIG.transcribeRatePerMinUSD[COST_CONFIG.transcribeModel] || 0;
     const transcribeUSD = (durationSec/60) * transcribeRate;
@@ -1298,24 +1698,52 @@ REIT=不動産投資信託。読みは「リート」
     }catch(e){ return null; }
   }
 
-  function finish(text, raw, costJPY, warningMsg){
-    saveEntry(text || raw, raw, lastDuration, costJPY, sessionMode);
-    if(warningMsg){ notice('error', warningMsg); } else { clearNotice(); }
+  function finish(text, raw, costJPY){
+    if(!saveEntry(text, raw, lastDuration, costJPY, sessionMode)){
+      notice('error','記録を端末に保存できませんでした。空き容量を確認して、もう一度お試しください。元音声は残っています。<br><button id="retrySaveBtn">もう一度保存</button>');
+      $('retrySaveBtn').onclick=async()=>{
+        if(!pendingCompletion) return;
+        if(finish(pendingCompletion.text,pendingCompletion.raw,pendingCompletion.costJPY)){
+          await cleanupAfterSavedRecord();
+        }
+      };
+      return false;
+    }
+    clearNotice();
     resetState();
     toast('記録が完成しました');
+    return true;
+  }
+
+  async function cleanupAfterSavedRecord(){
+    pendingCompletion=null;
+    const sid=sessionId;
+    const deleted=sid ? await clearSessionFromDB(sid) : true;
+    sessionId=null;
+    resetSessionState(true);
+    if(!deleted){
+      notice('error','記録は保存できましたが、元音声の自動削除に失敗しました。<br><button id="retryCleanupBtn">元音声の削除を再試行</button>');
+      $('retryCleanupBtn').onclick=async()=>{
+        if(await clearSessionFromDB(sid)){ clearNotice();toast('元音声を削除しました'); }
+      };
+    }
   }
 
   // ===== 履歴 =====
   function loadHistory(){ try{return JSON.parse(localStorage.getItem(HIST))||[];}catch(e){return [];} }
   function saveEntry(text, raw, duration, costJPY, mode){
-    const list=loadHistory();
-    list.unshift({
-      id:Date.now(),
-      date:new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
-      duration:fmtTime(duration), text, raw, costJPY, mode:mode||'business'
-    });
-    localStorage.setItem(HIST, JSON.stringify(list));
-    renderHistory();
+    try{
+      const list=loadHistory(),id=Date.now();
+      list.unshift({
+        id,
+        date:new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+        duration:fmtTime(duration), text, raw, costJPY, mode:mode||'business'
+      });
+      localStorage.setItem(HIST, JSON.stringify(list));
+      if(!loadHistory().some(e=>e.id===id)) throw new Error('history-verification-failed');
+      renderHistory();
+      return true;
+    }catch(e){ console.log('[履歴] 保存に失敗',e); return false; }
   }
   function deleteEntry(id){
     localStorage.setItem(HIST, JSON.stringify(loadHistory().filter(e=>e.id!==id)));
@@ -1410,6 +1838,13 @@ REIT=不動産投資信託。読みは「リート」
   $('resetStuckBtn').onclick = async () => {
     if(!confirm('送信できていない録音データを削除します。完了済みの記録は残ります。よろしいですか?')) return;
     try{
+      clearTimeout(rotateTimer);clearInterval(uiTimer);stopWaveformMonitor();releasePreviewUrls();
+      if(mediaRecorder && mediaRecorder.state==='recording'){
+        mediaRecorder.onstop=null;
+        mediaRecorder.stop();
+      }
+      if(stream){ stream.getTracks().forEach(t=>t.stop());stream=null; }
+      if(wakeLock){ wakeLock.release().catch(()=>{});wakeLock=null; }
       await clearAllPendingSessions();
     }catch(e){
       console.log('[IndexedDB] 未送信データの削除に失敗', e);
@@ -1418,6 +1853,7 @@ REIT=不動産投資信託。読みは「リート」
     }
     // 画面に残っている「詰まった」表示・状態もあわせてクリアする
     awaitingRetry = false;
+    recording = false;
     chunkList = []; sessionId = null;
     sessionActive = false; paused = false; ending = false;
     document.body.classList.remove('session-live', 'dim-mode');
@@ -1437,6 +1873,35 @@ REIT=不動産投資信託。読みは「リート」
   }
   clockCard.addEventListener('click', toggle);
   clockCard.addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(); } });
+
+  // ===== トリミング画面の操作 =====
+  trimStartEl.addEventListener('input',()=>{ stopPreview();updateTrimUI(true,'start'); });
+  trimEndEl.addEventListener('input',()=>{ stopPreview();updateTrimUI(true,'end'); });
+  document.querySelectorAll('[data-trim][data-delta]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const target=btn.dataset.trim==='start'?trimStartEl:trimEndEl;
+      target.value=String((Number(target.value)||0)+Number(btn.dataset.delta));
+      stopPreview();updateTrimUI(true,btn.dataset.trim);
+    });
+  });
+  trimPreviewBtn.onclick=()=>{
+    if(previewAudio && !previewAudio.paused) stopPreview();
+    else playPreviewFrom(trimStartSec);
+  };
+  trimFullBtn.onclick=()=>{
+    stopPreview();trimStartSec=0;trimEndSec=lastDuration;
+    trimStartEl.value='0';trimEndEl.value=String(Math.ceil(lastDuration));updateTrimUI();
+  };
+  trimConfirmBtn.onclick=confirmTrimAndFinalize;
+  trimDiscardBtn.onclick=async()=>{
+    if(!confirm('この録音を削除しますか？削除すると元に戻せません。')) return;
+    const sid=sessionId;
+    if(sid) await clearSessionFromDB(sid);
+    sessionId=null;
+    resetSessionState();
+    clearNotice();resetState();toast('録音を削除しました');
+  };
+  window.addEventListener('resize',()=>{ if(trimCardEl.classList.contains('show')) drawWaveform(); });
 
   // ===== 同意チェックの見た目連動 =====
   function updateConsentUI(){ clockCard.classList.toggle('disabled', !consentCheck.checked); }
