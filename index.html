@@ -20,8 +20,8 @@
     --paper:#F4F5F3;
     --card:#FBFBFA;
     --ink:#2B302E;
-    --muted:#9AA09C;
-    --faint:#C7CBC7;
+    --muted:#5C6864;       /* 屋外・年配者でも読める濃さ(旧#9AA09Cは約2.4:1しかコントラストがなかった) */
+    --faint:#7C847F;
     --line:#E6E8E4;
     --accent:#5B7B77;      /* 落ち着いたスレートグリーン */
     --accent-soft:#5B7B7722;
@@ -58,7 +58,8 @@
   header .brand{font-size:12px;letter-spacing:.22em;color:var(--faint);font-weight:600;}
   .gear{
     background:none;border:none;color:var(--faint);
-    width:34px;height:34px;font-size:18px;cursor:pointer;line-height:1;
+    width:44px;height:44px;font-size:18px;cursor:pointer;line-height:1;
+    display:flex;align-items:center;justify-content:center;
   }
 
   /* ---- 卓上時計風 待機カード(タップで開始/停止) ---- */
@@ -136,7 +137,7 @@
   .clock.rec .end-rec-btn{display:block;}
 
   /* 待機/記録の状態表示(ごく控えめ) */
-  .state{margin-top:22px;height:22px;font-size:13px;color:var(--muted);letter-spacing:.06em;}
+  .state{margin-top:22px;height:22px;font-size:14px;color:var(--muted);letter-spacing:.06em;}
   .clock.disabled{opacity:.55;}
 
   /* ---- 同意チェック ---- */
@@ -148,14 +149,14 @@
   .consent input{width:20px;height:20px;accent-color:var(--accent);cursor:pointer;}
   .consent input:disabled{cursor:default;opacity:.6;}
 
-  /* ---- 記録モード切替(商談/標準):同意チェックの下に添える(誤タップ防止に十分な間隔・タップ領域を確保) ---- */
+  /* ---- 記録モード切替(商談/メモ):同意チェックの下に添える(誤タップ防止に十分な間隔・タップ領域を確保) ---- */
   .mode-toggle-wrap{margin:22px 4px 30px;text-align:center;}
   .mode-toggle{
     display:flex;justify-content:center;gap:14px;
   }
   .mode-toggle button{
     background:none;border:1px solid var(--line);color:var(--muted);
-    padding:11px 22px;border-radius:999px;font-size:13px;cursor:pointer;letter-spacing:.04em;
+    padding:11px 22px;border-radius:999px;font-size:14px;cursor:pointer;letter-spacing:.04em;
   }
   .mode-toggle button.active{
     background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent);font-weight:600;
@@ -197,7 +198,7 @@
   }
   .trim-card.show{display:block;}
   .trim-card h2{font-size:18px;margin-bottom:8px;}
-  .trim-lead{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:18px;}
+  .trim-lead{font-size:15px;color:var(--muted);line-height:1.7;margin-bottom:18px;}
   .wave-wrap{
     position:relative;height:96px;border-radius:12px;overflow:hidden;
     background:var(--paper);border:1px solid var(--line);margin-bottom:18px;
@@ -205,17 +206,17 @@
   .wave-wrap canvas{width:100%;height:100%;display:block;}
   .trim-field{margin:15px 0;}
   .trim-field-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-  .trim-field label{font-size:13px;color:var(--muted);}
+  .trim-field label{font-size:14px;color:var(--muted);}
   .trim-time{font-size:18px;font-variant-numeric:tabular-nums;font-weight:600;}
   .trim-range{width:100%;accent-color:var(--accent);min-height:32px;}
   .trim-nudge{display:flex;gap:8px;margin-top:7px;}
   .trim-nudge button{
     min-height:44px;flex:1;border:1px solid var(--line);border-radius:10px;
-    background:var(--paper);color:var(--ink);font-size:13px;cursor:pointer;
+    background:var(--paper);color:var(--ink);font-size:14px;cursor:pointer;
   }
   .trim-summary{
     margin:18px 0 14px;padding:12px 14px;border-radius:12px;
-    background:var(--accent-soft);font-size:13px;color:var(--accent);line-height:1.7;
+    background:var(--accent-soft);font-size:14px;color:var(--accent);line-height:1.7;
   }
   .trim-preview{
     width:100%;min-height:48px;border:1px solid var(--accent-soft);border-radius:12px;
@@ -227,7 +228,7 @@
   .trim-full{border:1px solid var(--line);background:none;color:var(--muted);}
   .trim-discard{
     min-height:44px!important;border:none!important;background:none!important;
-    color:#A24736;font-size:12px!important;text-decoration:underline;text-underline-offset:3px;
+    color:#A24736;font-size:13px!important;text-decoration:underline;text-underline-offset:3px;
   }
 
   /* ---- 中断(一時停止)カード ---- */
@@ -236,7 +237,7 @@
     background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
     padding:22px 20px;margin-top:14px;text-align:center;
   }
-  .pause-card p{font-size:13px;color:var(--muted);line-height:1.8;margin-bottom:14px;}
+  .pause-card p{font-size:15px;color:var(--muted);line-height:1.8;margin-bottom:14px;}
   .resume-btn{
     width:100%;padding:16px 0;border-radius:14px;border:none;
     background:var(--accent);color:#fff;font-size:15px;font-weight:600;
@@ -246,13 +247,13 @@
   /* ---- 処理中/エラー ---- */
   .notice{
     margin-top:14px;padding:14px 16px;border-radius:14px;
-    font-size:13px;line-height:1.75;display:none;text-align:left;
+    font-size:15px;line-height:1.75;display:none;text-align:left;
   }
   .notice.busy{display:block;background:var(--accent-soft);color:var(--accent);}
   .notice.error{display:block;background:#B44a3a12;color:#A24736;}
   .notice button{
     margin-top:9px;background:none;border:1px solid currentColor;color:inherit;
-    padding:7px 15px;border-radius:9px;font-size:12px;cursor:pointer;
+    padding:7px 15px;border-radius:9px;font-size:13px;cursor:pointer;
   }
 
   /* ---- 出力フォーマット切替 ---- */
@@ -261,38 +262,38 @@
     display:flex;align-items:baseline;justify-content:space-between;
     margin:30px 6px 12px;
   }
-  .history-head h2{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.16em;}
-  .history-head small{font-size:11px;color:var(--faint);}
+  .history-head h2{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.16em;}
+  .history-head small{font-size:12px;color:var(--faint);}
   .card{
     background:var(--card);border:1px solid var(--line);
     border-radius:16px;padding:16px;margin-bottom:11px;
   }
   .card .meta{
     display:flex;justify-content:space-between;align-items:center;
-    font-size:11px;color:var(--muted);margin-bottom:9px;
+    font-size:12px;color:var(--muted);margin-bottom:9px;
     font-variant-numeric:tabular-nums;letter-spacing:.04em;
   }
   .card .meta .meta-left{display:flex;align-items:center;gap:7px;}
   .card .meta .meta-right{display:flex;align-items:baseline;gap:7px;}
-  .card .meta .cost{font-size:10px;color:var(--faint);}
+  .card .meta .cost{font-size:11px;color:var(--faint);}
   .card .meta .badge{
-    font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;
+    font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;
     letter-spacing:.04em;background:var(--accent-soft);color:var(--accent);
   }
-  .card .meta .badge.memo{background:#9AA09C22;color:var(--muted);}
+  .card .meta .badge.memo{background:#5C686422;color:var(--muted);}
   .card .tabs{
     display:flex;gap:6px;margin-bottom:11px;
   }
   .card .tabs button{
     background:none;border:1px solid var(--line);color:var(--muted);
-    padding:5px 12px;border-radius:999px;font-size:11px;cursor:pointer;
+    padding:5px 12px;border-radius:999px;font-size:13px;cursor:pointer;
     letter-spacing:.04em;
   }
   .card .tabs button.active{
     background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent);font-weight:600;
   }
   .card .text{
-    font-size:14px;line-height:1.95;white-space:pre-wrap;word-break:break-word;
+    font-size:16px;line-height:1.85;white-space:pre-wrap;word-break:break-word;
     max-height:6.2em;overflow:hidden;position:relative;
   }
   .card.open .text{max-height:none;}
@@ -304,12 +305,12 @@
   .card .actions{display:flex;gap:8px;margin-top:13px;}
   .card .actions button{
     flex:1;background:none;border:1px solid var(--line);color:var(--muted);
-    padding:9px 0;border-radius:10px;font-size:12px;cursor:pointer;letter-spacing:.04em;
+    padding:9px 0;border-radius:10px;font-size:14px;cursor:pointer;letter-spacing:.04em;
   }
   .card .actions button.primary{color:var(--accent);border-color:var(--accent-soft);}
   .card .actions button.danger{color:#A24736;border-color:#A2473622;}
   .empty{
-    text-align:center;color:var(--faint);font-size:13px;padding:30px 0;line-height:1.9;
+    text-align:center;color:var(--faint);font-size:14px;padding:30px 0;line-height:1.9;
   }
 
   /* ---- 設定モーダル ---- */
@@ -325,9 +326,9 @@
     padding:26px 22px calc(30px + env(safe-area-inset-bottom));
     box-shadow:0 -8px 40px rgba(0,0,0,.12);
   }
-  .modal h3{font-size:15px;margin-bottom:6px;}
-  .modal p{font-size:12px;color:var(--muted);line-height:1.85;margin-bottom:14px;}
-  .modal label.fld{display:block;font-size:11px;color:var(--muted);margin:16px 0 6px;letter-spacing:.08em;}
+  .modal h3{font-size:16px;margin-bottom:6px;}
+  .modal p{font-size:15px;color:var(--muted);line-height:1.85;margin-bottom:14px;}
+  .modal label.fld{display:block;font-size:13px;color:var(--muted);margin:16px 0 6px;letter-spacing:.08em;}
   .modal input, .modal textarea, .modal select{
     width:100%;background:var(--paper);border:1px solid var(--line);
     color:var(--ink);padding:12px 13px;border-radius:11px;font-size:14px;
@@ -343,7 +344,7 @@
   .btn-cancel{background:none;border:1px solid var(--line)!important;color:var(--muted);}
   .reset-link{
     display:block;width:100%;margin-top:18px;background:none;border:none;
-    color:#A24736;font-size:11px;text-decoration:underline;text-underline-offset:2px;
+    color:#A24736;font-size:12px;text-decoration:underline;text-underline-offset:2px;
     cursor:pointer;letter-spacing:.02em;text-align:center;
   }
 
@@ -382,7 +383,7 @@
   <div class="mode-toggle-wrap" id="modeToggleWrap">
     <div class="mode-toggle" id="modeToggle" role="tablist" aria-label="議事録形式">
       <button type="button" class="mode-btn active" data-mode="business" id="modeBusinessBtn">商談</button>
-      <button type="button" class="mode-btn" data-mode="memo" id="modeMemoBtn">標準</button>
+      <button type="button" class="mode-btn" data-mode="memo" id="modeMemoBtn">メモ</button>
     </div>
   </div>
 
@@ -1579,7 +1580,7 @@ REIT=不動産投資信託。読みは「リート」
     consentCheck.checked=false; // 録音1回ごとに同意を取り直す
     consentCheck.disabled=false;
     updateConsentUI();
-    setMode('business'); // 標準モードのまま次の商談を録ってしまう事故を防ぐため、毎回商談に戻す
+    setMode('business'); // メモモードのまま次の商談を録ってしまう事故を防ぐため、毎回商談に戻す
     if(sidToClean && !skipDbCleanup){
       clearSessionFromDB(sidToClean).then(checkForRecovery); // 完了したセッションを片付け、他に残っているものがあれば続けて案内する
     }
@@ -1846,7 +1847,7 @@ REIT=不動産投資信託。読みは「リート」
   function buildRecordCard(e, opts={}){
     const hasRaw = e.raw;
     const isMemo = e.mode==='memo';
-    const kindLabel = isMemo ? '標準記録' : '商談記録';
+    const kindLabel = isMemo ? 'メモ' : '商談記録';
     const costText = typeof e.costJPY==='number' ? `約${e.costJPY.toLocaleString('ja-JP')}円` : '-';
     const mail = localStorage.getItem(MAIL)||'';
     const card=document.createElement('div'); card.className='card'+(opts.open?' open':'');
