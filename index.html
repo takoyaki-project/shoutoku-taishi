@@ -357,8 +357,19 @@
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
+  /* ---- 記録テキストを選択したときに出る「誤変換を報告」ボタン ---- */
+  .report-selection-btn{
+    position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));
+    transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:var(--paper);font-size:14px;font-weight:600;
+    padding:12px 24px;border-radius:999px;border:none;opacity:0;pointer-events:none;
+    transition:all .2s;z-index:25;letter-spacing:.04em;cursor:pointer;
+    box-shadow:0 8px 20px rgba(0,0,0,.18);
+  }
+  .report-selection-btn.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0);}
+
   @media (prefers-reduced-motion:reduce){
-    .clock,.toast,.rec-dot{transition:none;}
+    .clock,.toast,.rec-dot,.report-selection-btn{transition:none;}
   }
 </style>
 </head>
@@ -481,6 +492,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<button class="report-selection-btn" id="reportSelectionBtn" type="button">誤変換を報告</button>
 
 <script>
 (() => {
@@ -887,7 +899,7 @@ REIT=不動産投資信託。読みは「リート」
         noticeEl=$('notice'), historyEl=$('history'), countEl=$('count'),
         completedCardBodyEl=$('completedCardBody'),
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
-        toastEl=$('toast'), consentCheck=$('consentCheck'),
+        toastEl=$('toast'), reportSelectionBtn=$('reportSelectionBtn'), consentCheck=$('consentCheck'),
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
         recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn'), recoveryTextEl=$('recoveryText'),
         modeBusinessBtn=$('modeBusinessBtn'), modeMemoBtn=$('modeMemoBtn'),
@@ -1933,6 +1945,34 @@ REIT=不動産投資信託。読みは「リート」
     completedCardBodyEl.appendChild(closeBtn);
     document.body.classList.add('record-done');
   }
+
+  // ===== 誤変換の報告(Googleフォーム連携) =====
+  // 送るのは利用者が選択した短い語句のみ。商談内容全体・顧客情報は一切送らない方針のため、
+  // 長すぎる選択(100文字超)ではボタン自体を出さない。
+  const REPORT_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfmSfBPkrITqRLPjTZgjjFDN0X5QhlSbGY0ioCc71fMG1HYFQ/viewform?usp=pp_url';
+  const REPORT_FORM_ENTRY_WRONG = 'entry.1340100169';
+  const REPORT_SELECTION_MAX_LEN = 100;
+  let reportSelectionText = '';
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    const text = sel && !sel.isCollapsed ? sel.toString().trim() : '';
+    const node = sel && sel.anchorNode;
+    const el = node && (node.nodeType===1 ? node : node.parentElement);
+    const insideRecordText = !!(el && el.closest && el.closest('.card .text'));
+    if(text && text.length<=REPORT_SELECTION_MAX_LEN && insideRecordText){
+      reportSelectionText = text;
+      reportSelectionBtn.classList.add('show');
+    }else{
+      reportSelectionText = '';
+      reportSelectionBtn.classList.remove('show');
+    }
+  });
+  reportSelectionBtn.onclick = () => {
+    if(!reportSelectionText) return;
+    const url = `${REPORT_FORM_URL}&${REPORT_FORM_ENTRY_WRONG}=${encodeURIComponent(reportSelectionText)}`;
+    window.open(url, '_blank');
+    reportSelectionBtn.classList.remove('show');
+  };
 
   // ===== 設定 =====
   function openModal(){
