@@ -1959,19 +1959,26 @@ REIT=不動産投資信託。読みは「リート」
         <button class="danger del">削除</button>
       </div>`;
     const t=card.querySelector('.text');
+    const expandBtn = card.querySelector('.expand');
     let showingRaw = false;
+    // 全文/そのままタブの切替直後や、record-done・session-live中で#historyがdisplay:noneの
+    // 間に描画された場合は、この時点でのt.clientHeightが0になり判定を誤る。
+    // ResizeObserverで「実際にレイアウトされた瞬間」を捉えて判定し直すことで、
+    // 画面が非表示の状態で作られたカードでも、後で表示されたときに正しく判定されるようにする。
+    const applyClampState = () => {
+      if(card.classList.contains('open')) return; // 展開中は判定しない(閉じるボタンを壊さないため)
+      if(t.clientHeight===0) return; // まだ非表示(レイアウト未確定)なら判定を保留する
+      const overflowing = t.scrollHeight>t.clientHeight+4;
+      t.classList.toggle('clamped', overflowing);
+      expandBtn.style.display = overflowing ? '' : 'none';
+    };
     const renderText = () => {
       t.textContent = showingRaw ? e.raw : e.text;
       t.classList.remove('clamped');
-      requestAnimationFrame(()=>{
-        if(t.scrollHeight>t.clientHeight+4 && !card.classList.contains('open')) t.classList.add('clamped');
-      });
+      requestAnimationFrame(applyClampState);
     };
     renderText();
-    const expandBtn = card.querySelector('.expand');
-    requestAnimationFrame(()=>{
-      if(t.scrollHeight<=t.clientHeight+4) expandBtn.style.display='none';
-    });
+    new ResizeObserver(applyClampState).observe(t);
     if(hasRaw){
       const tabFmt = card.querySelector('.tab-fmt'), tabRaw = card.querySelector('.tab-raw');
       tabFmt.onclick=()=>{ showingRaw=false; tabFmt.classList.add('active'); tabRaw.classList.remove('active'); renderText(); };
