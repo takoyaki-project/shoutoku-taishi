@@ -68,6 +68,8 @@ const instrumented = match[1].replace(
     setChunks(chunks) { chunkList = chunks; },
     getSelection() { return { start: trimStartSec, end: trimEndSec }; },
     normalizeTrimValues,
+    updateConsentUI, setMode,
+    getRecordMode() { return recordMode; },
   };
 })();`
 );
@@ -89,6 +91,26 @@ assert.equal(api.isRetryableFormatStatus(400), false);
 const wav = api.encodeWav(new Float32Array([0, 1, -1]), 16000);
 assert.equal(wav.type, 'audio/wav');
 assert.equal(wav.size, 50);
+
+// 手順1(同意)→手順3(録音)の状態制御:同意が無いと録音ボタンがdisabledになること
+const consentCheckMock = element('consentCheck');
+const clockCardMock = element('clockCard');
+consentCheckMock.checked = false;
+api.updateConsentUI();
+assert.equal(clockCardMock.classList.contains('disabled'), true, '同意チェックが無いとき、録音ボタンはdisabledであるべき');
+consentCheckMock.checked = true;
+api.updateConsentUI();
+assert.equal(clockCardMock.classList.contains('disabled'), false, '同意チェックがあるとき、録音ボタンはdisabledでないべき');
+
+// 手順2(モード)の状態制御:選択状態(見た目)と内部状態(recordMode)が一致すること
+api.setMode('memo');
+assert.equal(api.getRecordMode(), 'memo');
+assert.equal(element('modeMemoBtn').classList.contains('active'), true);
+assert.equal(element('modeBusinessBtn').classList.contains('active'), false);
+api.setMode('business');
+assert.equal(api.getRecordMode(), 'business');
+assert.equal(element('modeBusinessBtn').classList.contains('active'), true);
+assert.equal(element('modeMemoBtn').classList.contains('active'), false);
 
 api.setSelection(10, 9, 10);
 api.normalizeTrimValues('start');

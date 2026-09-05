@@ -26,6 +26,14 @@
     --accent:#5B7B77;      /* 落ち着いたスレートグリーン */
     --accent-soft:#5B7B7722;
     --radius:22px;
+    /* ---- 録音前トップ画面+履歴専用のトークン(新デザイン)。設定モーダル・トリム画面には使わない ---- */
+    --top-bg:#FCFCFA;
+    --top-ink:#252A28;
+    --top-muted:#66706C;
+    --top-green:#1F5A48;
+    --top-green-active:#2F7560;
+    --top-soft:#E7EFEB;
+    --top-line:#D8DDDA;
   }
   /* 録音中(フェーズ1)だけ配色を暗くする。電池対策(OLED省電力)目的。要素の増減は行わず配色のみ変更する。 */
   body.dim-mode{
@@ -37,6 +45,14 @@
     --line:#1B1D1B;
     --accent:#3F5652;
     --accent-soft:#3F565222;
+    /* ヘッダー(タイトル/サブコピー/アクセントライン)は録音中も表示されるため、
+       新トークンにも暗色版を用意し、黒背景で見えなくならないようにする */
+    --top-ink:#6B706C;
+    --top-muted:#3E413F;
+    --top-green:#3F5652;
+    --top-green-active:#3F5652;
+    --top-soft:#1B1D1B;
+    --top-line:#1B1D1B;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
@@ -50,16 +66,18 @@
   }
   .app{max-width:520px;margin:0 auto;padding:14px 16px 48px;}
 
-  /* ---- 目立たないトップバー ---- */
+  /* ---- ヘッダー(タイトル+サブコピー+設定) ---- */
   header{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:6px 6px 14px;
+    display:flex;align-items:flex-start;justify-content:space-between;
+    padding:10px 6px 14px;
   }
-  header .brand{font-size:12px;letter-spacing:.22em;color:var(--faint);font-weight:600;}
+  header .brand{font-size:26px;font-weight:600;color:var(--top-ink);letter-spacing:.01em;}
+  header .tagline{font-size:14px;color:var(--top-muted);margin-top:4px;}
+  .header-line{height:2px;background:var(--top-green);margin:0 6px 4px;border-radius:1px;}
   .gear{
-    background:none;border:none;color:var(--faint);
+    background:none;border:none;color:var(--top-muted);
     width:44px;height:44px;font-size:18px;cursor:pointer;line-height:1;
-    display:flex;align-items:center;justify-content:center;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
   }
 
   /* ---- 卓上時計風 待機カード(タップで開始/停止) ---- */
@@ -78,9 +96,13 @@
   .clock.rec{
     box-shadow:0 0 0 1px var(--accent-soft), 0 8px 30px rgba(91,123,119,.14);
   }
+  /* 録音前(待機)だけ、カードで囲わずボタンを画面に直接置く新デザインにする。
+     録音中(session-live)は上のカード外観(background/border/box-shadow)をそのまま使う。 */
+  body:not(.session-live) .clock{
+    background:none;border:none;box-shadow:none;padding:28px 4px 8px;
+  }
 
-  /* 時計本体(SVGリング + デジタル表示)。録音前は「ふち+上部の明るいグラデーション」で
-     押せる面(ボタン)らしく見せる。録音中(黒モード)はすべて元の見た目に戻す。 */
+  /* 時計本体(SVGリング + デジタル表示)。録音中(黒モード)の見た目・構造は変更しない。 */
   .dial{
     position:relative;width:214px;height:214px;margin:0 auto 8px;
     border-radius:50%;
@@ -90,7 +112,13 @@
     transition:background .3s ease, border-color .3s ease, box-shadow .3s ease;
   }
   .clock.rec .dial{background:none;border:none;box-shadow:none;}
-  .dial svg{position:absolute;inset:0;transform:rotate(-90deg);}
+  /* 録音前だけ、新デザインの淡い円(直径160px前後)に置き換える */
+  body:not(.session-live) .dial{
+    width:160px;height:160px;margin:0 auto 14px;
+    background:var(--top-soft);border:1.5px solid var(--top-line);box-shadow:none;
+  }
+  body:not(.session-live) .clock:not(.disabled) .dial{border-color:var(--top-green);}
+  .dial > svg{position:absolute;inset:0;transform:rotate(-90deg);}
   .dial .track{fill:none;stroke:var(--line);stroke-width:3;opacity:0;}
   .clock.rec .dial .track{opacity:1;} /* 録音中だけ元のリング線を表示する */
   .dial .sweep{
@@ -109,8 +137,18 @@
     display:none;
   }
   .idle-prompt{
+    display:flex;flex-direction:column;align-items:center;gap:10px;
     font-size:22px;font-weight:600;color:#fff;letter-spacing:.1em;
   }
+  /* 録音前だけ、マイクアイコン+グレー文字に切り替える。同意後は深緑にして押せる状態を示す */
+  body:not(.session-live) .idle-prompt{
+    gap:8px;font-size:15px;font-weight:500;letter-spacing:.03em;color:var(--top-muted);
+  }
+  body:not(.session-live) .clock:not(.disabled) .idle-prompt{color:var(--top-green);}
+  .mic-icon{width:30px;height:30px;}
+  /* 録音ボタンの下の補助文。同意前(disabled)のときだけ表示する */
+  .record-hint{display:none;margin-top:14px;font-size:13px;color:var(--top-muted);}
+  .clock.disabled + .record-hint{display:block;}
   /* 「録音中」ラベル+インジケータードット。実際に音量に応じてドットが明滅する(改善4)。
      実際に音を録れている(.clock.rec)ときだけ表示し、一時停止・処理中は表示しない
      (それらの状態は.state/pause-card側で案内する)。 */
@@ -140,43 +178,65 @@
   .state{margin-top:22px;height:22px;font-size:14px;color:var(--muted);letter-spacing:.06em;}
   .clock.disabled{opacity:.55;}
 
+  /* ---- 手順1/2/3 共通の型:数字+細い縦線+見出し、区切りは細い罫線のみ(カードで囲まない) ---- */
+  .step{padding:20px 4px;border-bottom:1px solid var(--top-line);}
+  .step-head{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+  .step-num{
+    font-size:15px;font-weight:700;color:var(--top-green);line-height:1;
+    padding-right:12px;border-right:1px solid var(--top-line);
+  }
+  .step-title{font-size:17px;font-weight:600;color:var(--top-ink);}
+  .step-record{text-align:center;}
+
   /* ---- 同意チェック ---- */
   .consent{
-    display:flex;align-items:center;justify-content:center;gap:10px;
-    margin:10px 4px 0;padding:8px 0;font-size:16px;color:var(--muted);cursor:pointer;
+    display:flex;align-items:center;justify-content:flex-start;gap:12px;
+    margin:0 4px;padding:13px 4px;font-size:16px;color:var(--top-ink);cursor:pointer;
     user-select:none;letter-spacing:.02em;
   }
-  .consent input{width:20px;height:20px;accent-color:var(--accent);cursor:pointer;}
+  .consent input{width:22px;height:22px;accent-color:var(--top-green);cursor:pointer;flex-shrink:0;}
   .consent input:disabled{cursor:default;opacity:.6;}
 
-  /* ---- 記録モード切替(商談/メモ):同意チェックの下に添える(誤タップ防止に十分な間隔・タップ領域を確保) ---- */
-  .mode-toggle-wrap{margin:22px 4px 30px;text-align:center;}
+  /* ---- 記録モード切替(商談/メモ):1つのトラック内で選択側だけ塗りつぶすセグメントコントロール ---- */
+  .mode-toggle-wrap{margin:0 4px;}
   .mode-toggle{
-    display:flex;justify-content:center;gap:14px;
+    display:flex;background:var(--top-soft);border-radius:10px;padding:4px;gap:4px;
   }
   .mode-toggle button{
-    background:none;border:1px solid var(--line);color:var(--muted);
-    padding:11px 22px;border-radius:999px;font-size:14px;cursor:pointer;letter-spacing:.04em;
+    flex:1;background:none;border:none;color:var(--top-ink);
+    padding:13px 0;border-radius:7px;font-size:15px;font-weight:500;cursor:pointer;letter-spacing:.02em;
   }
   .mode-toggle button.active{
-    background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent);font-weight:600;
+    background:var(--top-green-active);color:#fff;font-weight:600;
   }
 
-  /* ---- 録音中は「録音専用画面」にする:履歴・料金・議事録形式・同意UIを隠す ---- */
-  body.session-live .consent,
-  body.session-live .mode-toggle-wrap,
+  /* ---- 録音中は「録音専用画面」にする:履歴・料金・手順見出し・同意UIを隠す ---- */
+  body.session-live .step-consent,
+  body.session-live .step-mode,
+  body.session-live .step-record .step-head,
+  body.session-live .record-hint,
+  body.session-live .clock.disabled + .record-hint,
   body.session-live .history-head,
   body.session-live #history{
     display:none;
   }
-  body.trim-review .clock,body.trim-review header{display:none;}
+  /* 録音中(黒画面)は手順の余白・区切り線を足さず、以前と同じ配置のままにする */
+  body.session-live .step-record{padding:0;border-bottom:none;}
+  body.trim-review header,
+  body.trim-review .header-line,
+  body.trim-review .step-consent,
+  body.trim-review .step-mode,
+  body.trim-review .step-record{
+    display:none;
+  }
 
   /* ---- 完成直後の結果専用画面(改善1):録音カード等を隠し、完成した記録だけを表示する ---- */
   body.record-done header,
+  body.record-done .header-line,
   body.record-done .pause-card,
-  body.record-done .consent,
-  body.record-done .mode-toggle-wrap,
-  body.record-done .clock,
+  body.record-done .step-consent,
+  body.record-done .step-mode,
+  body.record-done .step-record,
   body.record-done .trim-card,
   body.record-done .history-head,
   body.record-done #history{
@@ -256,61 +316,61 @@
     padding:7px 15px;border-radius:9px;font-size:13px;cursor:pointer;
   }
 
-  /* ---- 出力フォーマット切替 ---- */
-  /* ---- 履歴 ---- */
+  /* ---- 履歴:カードで重ねず、白背景+細い区切り線のフラットな一覧にする ---- */
   .history-head{
     display:flex;align-items:baseline;justify-content:space-between;
-    margin:30px 6px 12px;
+    margin:34px 4px 4px;padding-bottom:12px;border-bottom:1px solid var(--top-line);
   }
-  .history-head h2{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.16em;}
-  .history-head small{font-size:12px;color:var(--faint);}
+  .history-head h2{font-size:17px;font-weight:600;color:var(--top-ink);letter-spacing:.02em;}
+  .history-head small{font-size:13px;color:var(--top-muted);}
   .card{
-    background:var(--card);border:1px solid var(--line);
-    border-radius:16px;padding:16px;margin-bottom:11px;
+    background:none;border:none;border-radius:0;
+    padding:16px 4px;margin-bottom:0;border-bottom:1px solid var(--top-line);
   }
   .card .meta{
     display:flex;justify-content:space-between;align-items:center;
-    font-size:12px;color:var(--muted);margin-bottom:9px;
-    font-variant-numeric:tabular-nums;letter-spacing:.04em;
+    font-size:13px;color:var(--top-muted);margin-bottom:9px;
+    font-variant-numeric:tabular-nums;letter-spacing:.02em;
   }
-  .card .meta .meta-left{display:flex;align-items:center;gap:7px;}
-  .card .meta .meta-right{display:flex;align-items:baseline;gap:7px;}
-  .card .meta .cost{font-size:11px;color:var(--faint);}
+  .card .meta .meta-left{display:flex;align-items:center;gap:8px;}
+  .card .meta .meta-right{display:flex;align-items:baseline;gap:8px;}
+  .card .meta .cost{font-size:12px;color:var(--top-muted);}
   .card .meta .badge{
-    font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;
-    letter-spacing:.04em;background:var(--accent-soft);color:var(--accent);
+    font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;
+    letter-spacing:.02em;background:var(--top-soft);color:var(--top-green);
   }
-  .card .meta .badge.memo{background:#5C686422;color:var(--muted);}
+  .card .meta .badge.memo{background:#66706C1A;color:var(--top-muted);}
   .card .tabs{
     display:flex;gap:6px;margin-bottom:11px;
   }
   .card .tabs button{
-    background:none;border:1px solid var(--line);color:var(--muted);
+    background:none;border:1px solid var(--top-line);color:var(--top-muted);
     padding:5px 12px;border-radius:999px;font-size:13px;cursor:pointer;
-    letter-spacing:.04em;
+    letter-spacing:.02em;
   }
   .card .tabs button.active{
-    background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent);font-weight:600;
+    background:var(--top-soft);border-color:var(--top-soft);color:var(--top-green);font-weight:600;
   }
   .card .text{
     font-size:16px;line-height:1.85;white-space:pre-wrap;word-break:break-word;
+    color:var(--top-ink);
     max-height:6.2em;overflow:hidden;position:relative;
   }
   .card.open .text{max-height:none;}
   .card .text.clamped::after{
     content:"";position:absolute;bottom:0;left:0;right:0;height:2em;
-    background:linear-gradient(transparent,var(--card));
+    background:linear-gradient(transparent,var(--paper));
   }
   .card.open .text.clamped::after{display:none;}
   .card .actions{display:flex;gap:8px;margin-top:13px;}
   .card .actions button{
-    flex:1;background:none;border:1px solid var(--line);color:var(--muted);
-    padding:9px 0;border-radius:10px;font-size:14px;cursor:pointer;letter-spacing:.04em;
+    flex:1;background:none;border:1px solid var(--top-line);color:var(--top-muted);
+    padding:9px 0;border-radius:10px;font-size:14px;cursor:pointer;letter-spacing:.02em;
   }
-  .card .actions button.primary{color:var(--accent);border-color:var(--accent-soft);}
+  .card .actions button.primary{color:var(--top-green-active);border-color:var(--top-soft);}
   .card .actions button.danger{color:#A24736;border-color:#A2473622;}
   .empty{
-    text-align:center;color:var(--faint);font-size:14px;padding:30px 0;line-height:1.9;
+    text-align:center;color:var(--top-muted);font-size:14px;padding:30px 0;line-height:1.9;
   }
 
   /* ---- 設定モーダル ---- */
@@ -377,42 +437,64 @@
 <div class="app">
 
   <header>
-    <span class="brand">聖徳太子</span>
+    <div class="header-text">
+      <p class="brand">聖徳太子</p>
+      <p class="tagline">録音するだけで、商談記録が完成</p>
+    </div>
     <button class="gear" id="gearBtn" aria-label="設定">⚙</button>
   </header>
+  <div class="header-line"></div>
 
   <div class="pause-card" id="recoveryCard">
     <p id="recoveryText">送信できていない録音があります。<br>再送信して報告書を作成しますか？</p>
     <button class="resume-btn" id="recoverBtn">再送信</button>
   </div>
 
-  <label class="consent" id="consentLabel" for="consentCheck">
-    <input type="checkbox" id="consentCheck">
-    <span>お客様の同意を得ました</span>
-  </label>
+  <section class="step step-consent">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">同意</span></div>
+    <label class="consent" id="consentLabel" for="consentCheck">
+      <input type="checkbox" id="consentCheck">
+      <span>お客様の同意を得ました</span>
+    </label>
+  </section>
 
-  <div class="mode-toggle-wrap" id="modeToggleWrap">
-    <div class="mode-toggle" id="modeToggle" role="tablist" aria-label="議事録形式">
-      <button type="button" class="mode-btn active" data-mode="business" id="modeBusinessBtn">商談</button>
-      <button type="button" class="mode-btn" data-mode="memo" id="modeMemoBtn">メモ</button>
-    </div>
-  </div>
-
-  <!-- 卓上時計風カード:タップして録音を開始する(停止は下の専用ボタンで行う) -->
-  <section class="clock" id="clockCard" role="button" tabindex="0" aria-label="タップして録音を開始">
-    <div class="dial">
-      <svg viewBox="0 0 214 214" aria-hidden="true">
-        <circle class="track" cx="107" cy="107" r="101"></circle>
-        <circle class="sweep" id="sweep" cx="107" cy="107" r="101"></circle>
-      </svg>
-      <div class="face">
-        <div class="idle-prompt" id="idlePrompt">録音開始</div>
-        <div class="rec-label" id="recLabel"><span class="rec-dot" id="recDot" aria-hidden="true"></span><span id="recLabelText">録音中</span></div>
-        <div class="time" id="elapsedTime">00:00:00</div>
+  <section class="step step-mode">
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">モード</span></div>
+    <div class="mode-toggle-wrap" id="modeToggleWrap">
+      <div class="mode-toggle" id="modeToggle" role="tablist" aria-label="議事録形式">
+        <button type="button" class="mode-btn active" data-mode="business" id="modeBusinessBtn">商談</button>
+        <button type="button" class="mode-btn" data-mode="memo" id="modeMemoBtn">メモ</button>
       </div>
     </div>
-    <div class="state" id="state"></div>
-    <button class="end-rec-btn" id="endRecBtn" type="button">録音を終了</button>
+  </section>
+
+  <section class="step step-record">
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">録音</span></div>
+    <!-- 卓上時計風カード:タップして録音を開始する(停止は下の専用ボタンで行う) -->
+    <section class="clock" id="clockCard" role="button" tabindex="0" aria-label="タップして録音を開始">
+      <div class="dial">
+        <svg viewBox="0 0 214 214" aria-hidden="true">
+          <circle class="track" cx="107" cy="107" r="101"></circle>
+          <circle class="sweep" id="sweep" cx="107" cy="107" r="101"></circle>
+        </svg>
+        <div class="face">
+          <div class="idle-prompt" id="idlePrompt">
+            <svg class="mic-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="9" y="2" width="6" height="12" rx="3" fill="currentColor"/>
+              <path d="M5 11a7 7 0 0 0 14 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="12" y1="18" x2="12" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <span>録音開始</span>
+          </div>
+          <div class="rec-label" id="recLabel"><span class="rec-dot" id="recDot" aria-hidden="true"></span><span id="recLabelText">録音中</span></div>
+          <div class="time" id="elapsedTime">00:00:00</div>
+        </div>
+      </div>
+      <div class="state" id="state"></div>
+      <button class="end-rec-btn" id="endRecBtn" type="button">録音を終了</button>
+    </section>
+    <p class="record-hint">同意を確認すると録音できます</p>
   </section>
 
   <section class="trim-card" id="trimCard" aria-labelledby="trimTitle">
