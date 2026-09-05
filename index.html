@@ -97,9 +97,10 @@
     box-shadow:0 0 0 1px var(--accent-soft), 0 8px 30px rgba(91,123,119,.14);
   }
   /* 録音前(待機)だけ、カードで囲わずボタンを画面に直接置く新デザインにする。
+     上側は詰めて円を持ち上げ、下側は指が届きやすい余白を少し残す。
      録音中(session-live)は上のカード外観(background/border/box-shadow)をそのまま使う。 */
   body:not(.session-live) .clock{
-    background:none;border:none;box-shadow:none;padding:28px 4px 8px;
+    background:none;border:none;box-shadow:none;padding:10px 4px 22px;
   }
 
   /* 時計本体(SVGリング + デジタル表示)。録音中(黒モード)の見た目・構造は変更しない。 */
@@ -112,6 +113,12 @@
     transition:background .3s ease, border-color .3s ease, box-shadow .3s ease;
   }
   .clock.rec .dial{background:none;border:none;box-shadow:none;}
+  /* 処理中・一時停止中(録音前でも録音中の黒画面でもない状態)は、
+     録音中の円と揃えてフラットな濃い緑の単色にする(グラデーション・ふち・影をやめる) */
+  body.session-live:not(.dim-mode) .clock:not(.rec) .dial{
+    background:var(--accent);border:none;box-shadow:none;
+  }
+  body.session-live:not(.dim-mode) .clock:not(.rec) .time{color:#fff;}
   /* 録音前だけ、新デザインの淡い円(直径160px前後)に置き換える */
   body:not(.session-live) .dial{
     width:160px;height:160px;margin:0 auto 14px;
@@ -187,6 +194,7 @@
   }
   .step-title{font-size:17px;font-weight:600;color:var(--top-ink);}
   .step-record{text-align:center;}
+  .step-record .step-head{margin-bottom:8px;} /* 見出しと円の間を詰めて、円を上に寄せる */
 
   /* ---- 同意チェック ---- */
   .consent{
