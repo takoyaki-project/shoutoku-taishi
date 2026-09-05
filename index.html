@@ -143,6 +143,16 @@
     font-variant-numeric:tabular-nums;line-height:1;
     display:none;
   }
+  /* 処理中(送信・整形待ち)は経過時間の代わりにローディングインジケーターを出す。
+     数字は円からはみ出して読めないうえ、処理中は経過時間に意味がないため。 */
+  .clock.processing .time{display:none;}
+  .spinner{
+    display:none;width:38px;height:38px;border-radius:50%;
+    border:3px solid rgba(255,255,255,.3);border-top-color:#fff;
+    animation:spin .8s linear infinite;
+  }
+  .clock.processing .spinner{display:block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
   .idle-prompt{
     display:flex;flex-direction:column;align-items:center;gap:10px;
     font-size:22px;font-weight:600;color:#fff;letter-spacing:.1em;
@@ -438,6 +448,7 @@
 
   @media (prefers-reduced-motion:reduce){
     .clock,.toast,.rec-dot,.report-selection-btn{transition:none;}
+    .spinner{animation:none;}
   }
 </style>
 </head>
@@ -497,6 +508,7 @@
           </div>
           <div class="rec-label" id="recLabel"><span class="rec-dot" id="recDot" aria-hidden="true"></span><span id="recLabelText">録音中</span></div>
           <div class="time" id="elapsedTime">00:00:00</div>
+          <div class="spinner" aria-hidden="true"></div>
         </div>
       </div>
       <div class="state" id="state"></div>
@@ -1203,6 +1215,7 @@ REIT=不動産投資信託。読みは「リート」
     }else{
       elapsedTimeEl.textContent = fmtLongTime(lastDuration); // 円に表示する経過時間を、復旧した録音長に合わせておく
       stateEl.textContent = '処理中…';
+      clockCard.classList.add('processing');
       await finalizeSession();
     }
   }
@@ -1349,6 +1362,7 @@ REIT=不動産投資信託。読みは「リート」
     document.body.classList.remove('dim-mode'); // フェーズ2(処理中)は通常表示に戻す
     sweepEl.style.strokeDasharray = `1 ${CIRC}`;
     stateEl.textContent = '処理中…';
+    clockCard.classList.add('processing');
     if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
     if(stream){ stream.getTracks().forEach(t=>t.stop()); }
   }
@@ -1655,6 +1669,7 @@ REIT=不動産投資信託。読みは「リート」
       document.body.classList.remove('trim-review');
       elapsedTimeEl.textContent = fmtLongTime(lastDuration); // 円に表示する経過時間を、選択した範囲の長さに合わせておく
       stateEl.textContent='処理中…';
+      clockCard.classList.add('processing');
       await finalizeSession();
     }catch(e){
       chunkList=originalChunks;sessionPhase='reviewing';
@@ -1664,7 +1679,7 @@ REIT=不動産投資信託。読みは「リート」
     }
   }
 
-  function resetState(){ stateEl.textContent=''; } // 円の下の説明文は「録音開始」表示と重複するため出さない
+  function resetState(){ stateEl.textContent=''; clockCard.classList.remove('processing'); } // 円の下の説明文は「録音開始」表示と重複するため出さない
 
   function resetSessionState(skipDbCleanup=false){
     const sidToClean = sessionId;
@@ -1786,6 +1801,7 @@ REIT=不動産投資信託。読みは「リート」
     if(blockingPending.length>0){
       awaitingRetry = true; // オンライン復帰時に自動再送信の対象とする
       stateEl.textContent = '処理中…';
+      clockCard.classList.add('processing');
       const authFailed = blockingPending.some(c=>c.authError);
       let msg;
       if(authFailed){
