@@ -70,9 +70,12 @@
   /* ---- ヘッダー(タイトル+サブコピー+設定) ---- */
   header{
     display:flex;align-items:flex-start;justify-content:space-between;
-    padding:10px 6px 14px;
+    padding:8px 6px 10px;
   }
-  header .brand{font-size:26px;font-weight:600;color:var(--top-ink);letter-spacing:.01em;}
+  header .brand{
+    font-size:26px;font-weight:600;color:var(--top-ink);letter-spacing:.01em;
+    font-family:"YuGothic","Yu Gothic Medium","Yu Gothic",sans-serif;
+  }
   header .tagline{font-size:14px;color:var(--top-muted);margin-top:4px;}
   .header-line{height:2px;background:var(--top-green);margin:0 6px 4px;border-radius:1px;}
   .gear{
@@ -102,7 +105,7 @@
      上側は詰めて円を持ち上げ、下側は指が届きやすい余白を少し残す。
      録音中(session-live)は上のカード外観(background/border/box-shadow)をそのまま使う。 */
   body:not(.session-live) .clock{
-    background:none;border:none;box-shadow:none;padding:10px 4px 22px;
+    background:none;border:none;box-shadow:none;padding:0 4px 10px;
   }
 
   /* 時計本体(SVGリング + デジタル表示)。録音中(黒モード)の見た目・構造は変更しない。 */
@@ -123,7 +126,7 @@
   body.session-live:not(.dim-mode) .clock:not(.rec) .time{color:#fff;}
   /* 録音前だけ、新デザインの淡い円(直径160px前後)に置き換える */
   body:not(.session-live) .dial{
-    width:160px;height:160px;margin:0 auto 14px;
+    width:128px;height:128px;margin:0 auto 6px;
     background:var(--top-soft);border:1.5px solid var(--top-line);box-shadow:none;
   }
   body:not(.session-live) .clock:not(.disabled) .dial{border-color:var(--top-green);}
@@ -164,9 +167,9 @@
     gap:8px;font-size:15px;font-weight:500;letter-spacing:.03em;color:var(--top-muted);
   }
   body:not(.session-live) .clock:not(.disabled) .idle-prompt{color:var(--top-green);}
-  .mic-icon{width:30px;height:30px;}
+  .mic-icon{width:26px;height:26px;}
   /* 録音ボタンの下の補助文。同意前(disabled)のときだけ表示する */
-  .record-hint{display:none;margin-top:14px;font-size:13px;color:var(--top-muted);}
+  .record-hint{display:none;margin-top:6px;font-size:13px;color:var(--top-muted);}
   .clock.disabled + .record-hint{display:block;}
   /* 「録音中」ラベル+インジケータードット。実際に音量に応じてドットが明滅する(改善4)。
      実際に音を録れている(.clock.rec)ときだけ表示し、一時停止・処理中は表示しない
@@ -198,7 +201,7 @@
   .clock.disabled{opacity:.55;}
 
   /* ---- 手順1/2/3 共通の型:数字+細い縦線+見出し、区切りは細い罫線のみ(カードで囲まない) ---- */
-  .step{padding:20px 4px;border-bottom:1px solid var(--top-line);}
+  .step{padding:12px 4px;border-bottom:1px solid var(--top-line);}
   .step-head{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
   .step-num{
     font-size:15px;font-weight:700;color:var(--top-green);line-height:1;
@@ -206,7 +209,7 @@
   }
   .step-title{font-size:17px;font-weight:600;color:var(--top-ink);}
   .step-record{text-align:center;}
-  .step-record .step-head{margin-bottom:8px;} /* 見出しと円の間を詰めて、円を上に寄せる */
+  .step-record .step-head{margin-bottom:4px;} /* 見出しと円の間を詰めて、円を上に寄せる */
 
   /* ---- 同意チェック ---- */
   .consent{
@@ -352,7 +355,11 @@
   }
   .card.compact{cursor:pointer;transition:background-color .15s ease;}
   .card.compact:active{background:#0000000A;}
-  .card.compact .meta{margin-bottom:0;}
+  .card.compact .meta{margin-bottom:6px;}
+  .card.compact .preview{
+    font-size:14px;color:var(--top-ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
   .card .meta{
     display:flex;justify-content:space-between;align-items:center;
     font-size:13px;color:var(--top-muted);margin-bottom:9px;
@@ -2048,7 +2055,12 @@ REIT=不動産投資信託。読みは「リート」
     card.setAttribute('role','button');
     card.tabIndex=0;
     card.setAttribute('aria-label',`${kindLabel} ${e.date} の記録を開く`);
-    card.innerHTML=`<div class="meta"><span class="meta-left"><span class="badge${isMemo?' memo':''}">${kindLabel}</span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>`;
+    card.innerHTML=`<div class="meta"><span class="meta-left"><span class="badge${isMemo?' memo':''}">${kindLabel}</span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>
+      <div class="preview"></div>`;
+    // 日付だけでは商談を探しにくいため、要約の1行目(【同席者】など)を一覧に出す。
+    // textContentで挿入し、記録内容をHTMLとして解釈しないようにする。
+    const firstLine = (e.text||'').split('\n').map(s=>s.trim()).find(Boolean) || '';
+    card.querySelector('.preview').textContent = firstLine;
     card.addEventListener('click', onOpen);
     card.addEventListener('keydown', ev=>{ if(ev.key===' '||ev.key==='Enter'){ ev.preventDefault(); onOpen(); } });
     return card;
