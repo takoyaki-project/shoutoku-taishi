@@ -2057,9 +2057,11 @@ REIT=不動産投資信託。読みは「リート」
     card.setAttribute('aria-label',`${kindLabel} ${e.date} の記録を開く`);
     card.innerHTML=`<div class="meta"><span class="meta-left"><span class="badge${isMemo?' memo':''}">${kindLabel}</span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>
       <div class="preview"></div>`;
-    // 日付だけでは商談を探しにくいため、要約の1行目(【同席者】など)を一覧に出す。
+    // 日付だけでは商談を探しにくいため、要約冒頭(【同席者】とその内容など)を一覧に出す。
+    // 見出しと内容が別行になっているAI出力でも切れないよう、改行はスペースに畳んでから
+    // 先頭の一定文字数を取り出す(表示上の最終的な省略はCSSのellipsisに任せる)。
     // textContentで挿入し、記録内容をHTMLとして解釈しないようにする。
-    const firstLine = (e.text||'').split('\n').map(s=>s.trim()).find(Boolean) || '';
+    const firstLine = (e.text||'').replace(/\s*\n\s*/g,' ').trim().slice(0,120);
     card.querySelector('.preview').textContent = firstLine;
     card.addEventListener('click', onOpen);
     card.addEventListener('keydown', ev=>{ if(ev.key===' '||ev.key==='Enter'){ ev.preventDefault(); onOpen(); } });
