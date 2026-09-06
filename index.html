@@ -350,6 +350,9 @@
     background:none;border:none;border-radius:0;
     padding:16px 4px;margin-bottom:0;border-bottom:1px solid var(--top-line);
   }
+  .card.compact{cursor:pointer;transition:background-color .15s ease;}
+  .card.compact:active{background:#0000000A;}
+  .card.compact .meta{margin-bottom:0;}
   .card .meta{
     display:flex;justify-content:space-between;align-items:center;
     font-size:13px;color:var(--top-muted);margin-bottom:9px;
@@ -467,9 +470,9 @@
       <p class="tagline">録音するだけで、商談記録が完成</p>
     </div>
     <button class="gear" id="gearBtn" aria-label="設定">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
         <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 13a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V19a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 17.09a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
     </button>
   </header>
@@ -1010,7 +1013,7 @@ REIT=不動産投資信託。読みは「リート」
         recLabelTextEl=$('recLabelText'), recDotEl=$('recDot'), endRecBtnEl=$('endRecBtn'),
         stateEl=$('state'), sweepEl=$('sweep'),
         noticeEl=$('notice'), historyEl=$('history'), countEl=$('count'),
-        completedCardBodyEl=$('completedCardBody'),
+        completedCardBodyEl=$('completedCardBody'), completedTitleEl=$('completedTitle'),
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
         toastEl=$('toast'), reportSelectionBtn=$('reportSelectionBtn'), consentCheck=$('consentCheck'),
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
@@ -1981,7 +1984,7 @@ REIT=不動産投資信託。読みは「リート」
     const mail = localStorage.getItem(MAIL)||'';
     const card=document.createElement('div'); card.className='card'+(opts.open?' open':'');
     card.innerHTML=`
-      <div class="meta"><span class="meta-left"><span class="badge${isMemo?' memo':''}">${kindLabel}</span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>
+      <div class="meta"><span class="meta-left">${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>
       ${hasRaw ? `<div class="tabs">
         <button class="tab-fmt active" data-tab="fmt">${kindLabel}</button>
         <button class="tab-raw" data-tab="raw">話した内容そのまま</button>
@@ -1990,7 +1993,7 @@ REIT=不動産投資信託。読みは「リート」
       <div class="actions">
         <button class="copy">コピー</button>
         <button class="primary mail">メールで送る</button>
-        <button class="expand">全文</button>
+        ${opts.open ? '' : '<button class="expand">全文</button>'}
         <button class="danger del">削除</button>
       </div>`;
     const t=card.querySelector('.text');
@@ -2026,12 +2029,28 @@ REIT=不動産投資信託。読みは「リート」
       const to=encodeURIComponent(mail);
       location.href=`mailto:${to}?subject=${subject}&body=${body}`;
     };
-    expandBtn.onclick=ev=>{ card.classList.toggle('open'); ev.target.textContent=card.classList.contains('open')?'閉じる':'全文'; };
+    if(expandBtn) expandBtn.onclick=ev=>{ card.classList.toggle('open'); ev.target.textContent=card.classList.contains('open')?'閉じる':'全文'; };
     card.querySelector('.del').onclick=()=>{
       if(!confirm('この記録を削除しますか?')) return;
       deleteEntry(e.id);
       if(opts.onDelete) opts.onDelete();
     };
+    return card;
+  }
+  // 履歴一覧の1行:モードバッジ・日時・時間・費用だけを表示する、タップで開くだけの軽量カード。
+  // コピー/メール/全文切替/削除はすべて開いた先のポップアップ(showCompletedRecord)に集約する。
+  function buildCompactHistoryCard(e, onOpen){
+    const isMemo = e.mode==='memo';
+    const kindLabel = isMemo ? 'メモ' : '商談記録';
+    const costText = typeof e.costJPY==='number' ? `約${e.costJPY.toLocaleString('ja-JP')}円` : '-';
+    const card=document.createElement('div');
+    card.className='card compact';
+    card.setAttribute('role','button');
+    card.tabIndex=0;
+    card.setAttribute('aria-label',`${kindLabel} ${e.date} の記録を開く`);
+    card.innerHTML=`<div class="meta"><span class="meta-left"><span class="badge${isMemo?' memo':''}">${kindLabel}</span>${e.date}</span><span class="meta-right">${e.duration}<span class="cost">${costText}</span></span></div>`;
+    card.addEventListener('click', onOpen);
+    card.addEventListener('keydown', ev=>{ if(ev.key===' '||ev.key==='Enter'){ ev.preventDefault(); onOpen(); } });
     return card;
   }
   function renderHistory(){
@@ -2051,13 +2070,16 @@ REIT=不動産投資信託。読みは「リート」
     countEl.textContent = `${list.length}件・今月:約${monthTotal.toLocaleString('ja-JP')}円`;
     historyEl.innerHTML='';
     for(const e of list){
-      historyEl.appendChild(buildRecordCard(e));
+      const kindLabel = e.mode==='memo' ? 'メモ' : '商談記録';
+      historyEl.appendChild(buildCompactHistoryCard(e, () => showCompletedRecord(e, { title:`${kindLabel} ${e.date}` })));
     }
   }
 
-  // 処理完了後、履歴を開かずその場で全文表示する(改善1)。「閉じる」で通常の録音待ち画面に戻る。
-  function showCompletedRecord(entry){
+  // 処理完了後の全画面表示、および履歴タップ時のポップアップ表示の両方で使う共通の詳細画面。
+  // 「閉じる」で通常の録音待ち画面(履歴一覧を含む)に戻る。
+  function showCompletedRecord(entry, opts={}){
     if(!entry) return;
+    completedTitleEl.textContent = opts.title || '記録が完成しました';
     completedCardBodyEl.innerHTML='';
     completedCardBodyEl.appendChild(buildRecordCard(entry, {
       open:true,
