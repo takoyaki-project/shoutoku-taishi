@@ -204,10 +204,22 @@
   /* 処理中(送信・整形待ち):中央に別のリングを重ねず、録音中と同じ外周の弧を
      ぐるっと回転させるアニメーションで表現する(録音中の視覚表現に揃える)。
      丸の塗り(緑背景)はそのまま維持するため、塗りと同化しないよう弧は白系にする。
-     弧の長さ(stroke-dasharray)はJS側でCIRC(円周長)を基準に設定する。 */
+     弧が一定速度で回るだけだと「一周したら終わる進捗表示」に見えて誤解を招くため、
+     弧の長さ自体も伸び縮みさせる(不定形スピナーの定番パターン)。これにより、
+     処理が完了して画面が切り替わるタイミングが弧の一周と無関係でも、
+     「たまたま半端な位置で止まった」ようには見えなくなる。
+     stroke-dasharrayの数値はCIRC(円周長、約635)を基準にした固定値。 */
   .clock.processing .dial .track{opacity:1;stroke:rgba(255,255,255,.35);}
-  .clock.processing .dial .sweep{opacity:1;stroke:#fff;animation:dial-spin 1s linear infinite;}
+  .clock.processing .dial .sweep{
+    opacity:1;stroke:#fff;
+    animation:dial-spin 1.6s linear infinite, dial-dash 1.6s ease-in-out infinite;
+  }
   @keyframes dial-spin{to{transform:rotate(360deg);}}
+  @keyframes dial-dash{
+    0%{stroke-dasharray:15 620;stroke-dashoffset:0;}
+    50%{stroke-dasharray:245 620;stroke-dashoffset:-150;}
+    100%{stroke-dasharray:15 620;stroke-dashoffset:-635;}
+  }
   .dial .face{
     position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;
