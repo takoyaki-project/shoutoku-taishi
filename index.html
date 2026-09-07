@@ -86,35 +86,53 @@
   }
   .gear svg{width:22px;height:22px;}
 
-  /* ---- 初回案内A・B共通:同じ見た目のルール(濃色カード)で統一する ---- */
+  /* ---- 初回案内A・B共通:大きさ・位置は別々だが、背景色のトーン(淡いグリーン)だけ揃える ---- */
+  /* 案内B: 設定アイコンを指す吹き出し(辞書機能の紹介)。大きさ・位置は変更せず、
+     背景色だけ黒から淡いグリーン(--top-soft、案内Aと同じトークン)に変更する。 */
   .onboard-msg{
     display:none;z-index:15;
-    background:var(--ink);color:var(--paper);border-radius:14px;
+    background:var(--top-soft);color:var(--ink);border-radius:14px;
     padding:16px 36px 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,.22);
   }
   .onboard-msg.show{display:block;}
-  .onboard-msg p{font-size:13px;line-height:1.8;color:var(--paper);margin:0;position:relative;}
+  .onboard-msg p{font-size:13px;line-height:1.8;color:var(--ink);margin:0;position:relative;}
   .onboard-msg .onboard-close{
     position:absolute;top:6px;right:6px;background:none;border:none;
-    color:var(--paper);opacity:.75;font-size:18px;line-height:1;width:28px;height:28px;
+    color:var(--muted);font-size:18px;line-height:1;width:28px;height:28px;
     cursor:pointer;display:flex;align-items:center;justify-content:center;
   }
-
-  /* 案内A: アプリ全体の紹介。「1|同意」の上に挟み込まず、画面上部にオーバーレイでどーんと表示する。
-     topの値はヘッダーの実際の高さに合わせてJS側で上書きする(このtopはJS実行前の暫定値)。 */
-  #onboardA{
-    position:fixed;left:50%;top:70px;transform:translateX(-50%);
-    width:min(340px, calc(100% - 32px));
-  }
-
-  /* 案内B: 設定アイコンを指す吹き出し(辞書機能の紹介)。位置と矢印はそのまま維持する */
   #onboardB{
     position:absolute;top:52px;right:6px;
     width:min(272px, calc(100vw - 48px));
   }
   #onboardB::before{
     content:'';position:absolute;top:-6px;right:18px;
-    width:12px;height:12px;background:var(--ink);transform:rotate(45deg);
+    width:12px;height:12px;background:var(--top-soft);transform:rotate(45deg);
+  }
+
+  /* 案内A: アプリ全体の自己紹介。警告的な黒背景オーバーレイにはせず、
+     画面の最前面・中央に、大きなフォントで堂々と表示する。
+     Bと同じ--top-soft/--inkトークンを使うことで、背景色のトーンだけ揃える。 */
+  .onboard-a-overlay{
+    display:none;position:fixed;inset:0;z-index:16;
+    align-items:center;justify-content:center;padding:24px;
+  }
+  .onboard-a-overlay.show{display:flex;}
+  .onboard-a-card{
+    position:relative;width:min(380px, 100%);
+    /* --top-softは半透明トークン(下地が透ける)のため、Aは常に背景ページの上に
+       直接乗る想定で、同じトーンを不透明色に起こしたものを使う(下に何があっても濁らない)。 */
+    background:#E5ECEA;border:1px solid var(--top-line);border-radius:20px;
+    padding:34px 30px 30px;
+    box-shadow:0 20px 50px rgba(0,0,0,.22);
+  }
+  .onboard-a-card p{
+    font-size:17px;line-height:1.9;color:var(--ink);font-weight:500;margin:0;
+  }
+  .onboard-a-card .onboard-close{
+    position:absolute;top:10px;right:10px;background:none;border:none;
+    color:var(--muted);font-size:22px;line-height:1;width:34px;height:34px;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
   }
 
   /* ---- 設定画面:辞書説明・お問い合わせ等のリンク導線 ---- */
@@ -569,16 +587,18 @@
     </button>
     <!-- 初回案内B:辞書機能の紹介(案内Aを閉じた直後に表示する吹き出し) -->
     <div class="onboard-msg" id="onboardB">
-      <p>このアプリは、保険用語に対応した辞書を持っていますが、まだ完璧ではありません。誤変換に気づいたときは、その単語を選択すると「報告」できます。よく出るお客様のお名前などは、ご自身で登録できるユーザー辞書があります。</p>
+      <p>保険用語に対応した辞書を持っていますが、まだ完璧ではありません。誤変換に気づいたときは、その単語を選択すると「報告」できます。報告は辞書の改善に役立ちます。よく出るお客様のお名前などは、ご自身で登録できるユーザー辞書があります。</p>
       <button type="button" class="onboard-close" id="onboardBCloseBtn" aria-label="閉じる">×</button>
     </div>
   </header>
   <div class="header-line"></div>
 
-  <!-- 初回案内A:アプリ全体の紹介(初回のみ表示) -->
-  <div class="onboard-msg" id="onboardA">
-    <p>このアプリは、保険商談を録音するだけで、AIが自動で文字起こし・要約し、提出できる記録に仕上げます。<br>録音データは端末内にのみ保存され、外部のサーバーに保管されることはありません。</p>
-    <button type="button" class="onboard-close" id="onboardACloseBtn" aria-label="閉じる">×</button>
+  <!-- 初回案内A:アプリ全体の紹介(初回のみ表示)。画面中央に大きく表示する -->
+  <div class="onboard-a-overlay" id="onboardA">
+    <div class="onboard-a-card">
+      <p>このアプリは、保険商談を録音するだけで、AIが自動で文字起こし・要約し、提出できる記録に仕上げます。<br>録音データは端末内にのみ保存され、外部のサーバーに保管されることはありません。</p>
+      <button type="button" class="onboard-close" id="onboardACloseBtn" aria-label="閉じる">×</button>
+    </div>
   </div>
 
   <div class="pause-card" id="recoveryCard">
@@ -2321,10 +2341,7 @@ REIT=不動産投資信託。読みは「リート」
   }
   function initOnboarding(){
     if(FORCE_SHOW_ONBOARDING || !localStorage.getItem(ONBOARD_A)){
-      // ヘッダー(タイトル・歯車)を覆わないよう、実際のヘッダー高さの直下に表示する
-      const header = document.querySelector('header');
-      if(header) onboardAEl.style.top = (header.getBoundingClientRect().bottom + 10) + 'px';
-      onboardAEl.classList.add('show');
+      onboardAEl.classList.add('show'); // 画面中央にオーバーレイ表示(位置はCSSのflex中央寄せで決まる)
     }else{
       showOnboardB();
     }
