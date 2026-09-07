@@ -69,6 +69,7 @@
 
   /* ---- ヘッダー(タイトル+サブコピー+設定) ---- */
   header{
+    position:relative;
     display:flex;align-items:flex-start;justify-content:space-between;
     padding:8px 6px 10px;
   }
@@ -84,6 +85,65 @@
     display:flex;align-items:center;justify-content:center;flex-shrink:0;
   }
   .gear svg{width:22px;height:22px;}
+
+  /* ---- 初回案内A(トップページ:アプリ全体の紹介) ---- */
+  .onboard-banner{
+    display:none;position:relative;background:var(--accent-soft);
+    border:1px solid var(--top-line);border-radius:14px;
+    padding:14px 36px 14px 16px;margin:0 6px 12px;
+  }
+  .onboard-banner.show{display:block;}
+  .onboard-banner p{font-size:13px;line-height:1.8;color:var(--ink);margin:0;}
+  .onboard-close{
+    position:absolute;top:6px;right:6px;background:none;border:none;
+    color:var(--muted);font-size:18px;line-height:1;width:28px;height:28px;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---- 初回案内B(設定アイコン付近の吹き出し:辞書機能の紹介) ---- */
+  .onboard-tooltip{
+    display:none;position:absolute;top:52px;right:6px;z-index:15;
+    width:min(272px, calc(100vw - 48px));
+    background:var(--ink);color:var(--paper);border-radius:12px;
+    padding:14px 32px 14px 14px;box-shadow:0 8px 24px rgba(0,0,0,.22);
+  }
+  .onboard-tooltip.show{display:block;}
+  .onboard-tooltip::before{
+    content:'';position:absolute;top:-6px;right:18px;
+    width:12px;height:12px;background:var(--ink);transform:rotate(45deg);
+  }
+  .onboard-tooltip p{font-size:13px;line-height:1.8;margin:0;position:relative;}
+  .onboard-tooltip .onboard-close{color:var(--paper);opacity:.75;}
+
+  /* ---- 設定画面:辞書説明・お問い合わせ等のリンク導線 ---- */
+  .settings-block{margin:16px 0;}
+  .settings-block p{margin-bottom:10px;}
+  .link-btn{
+    display:inline-block;background:none;border:1px solid var(--line);
+    color:var(--accent);font-size:13px;font-weight:600;
+    padding:10px 16px;border-radius:10px;cursor:pointer;
+  }
+
+  /* ---- 設定画面:ユーザー辞書(人名など、端末専用の個人辞書) ---- */
+  .user-dict-desc{font-size:13px!important;color:var(--muted);margin-bottom:10px!important;}
+  .user-dict-add{display:flex;gap:6px;margin-bottom:10px;}
+  .user-dict-add input{width:0;flex:1 1 auto;}
+  .user-dict-add button{
+    flex-shrink:0;background:var(--accent);color:#fff;border:none;border-radius:10px;
+    padding:0 16px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .user-dict-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;}
+  .user-dict-list li{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    background:var(--paper);border:1px solid var(--line);border-radius:10px;
+    padding:9px 10px;font-size:13px;color:var(--ink);
+  }
+  .user-dict-list .ud-pair{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .user-dict-list .ud-del{
+    flex-shrink:0;background:none;border:none;color:#A24736;font-size:12px;
+    text-decoration:underline;cursor:pointer;padding:4px;
+  }
+  .user-dict-empty{font-size:12px;color:var(--muted);padding:4px 2px;}
 
   /* ---- 卓上時計風 待機カード(タップで開始/停止) ---- */
   .clock{
@@ -482,8 +542,19 @@
         <circle cx="12" cy="12" r="3"/>
       </svg>
     </button>
+    <!-- 初回案内B:辞書機能の紹介(案内Aを閉じた直後に表示する吹き出し) -->
+    <div class="onboard-tooltip" id="onboardB">
+      <p>このアプリは、保険用語に対応した辞書を持っていますが、まだ完璧ではありません。誤変換に気づいたときは、その単語を選択すると「報告」できます。よく出るお客様のお名前などは、ご自身で登録できるユーザー辞書があります。</p>
+      <button type="button" class="onboard-close" id="onboardBCloseBtn" aria-label="閉じる">×</button>
+    </div>
   </header>
   <div class="header-line"></div>
+
+  <!-- 初回案内A:アプリ全体の紹介(初回のみ表示) -->
+  <div class="onboard-banner" id="onboardA">
+    <p>このアプリは、保険商談を録音するだけで、AIが自動で文字起こし・要約し、提出できる記録に仕上げます。<br>録音データは端末内にのみ保存され、外部のサーバーに保管されることはありません。</p>
+    <button type="button" class="onboard-close" id="onboardACloseBtn" aria-label="閉じる">×</button>
+  </div>
 
   <div class="pause-card" id="recoveryCard">
     <p id="recoveryText">送信できていない録音があります。<br>再送信して報告書を作成しますか？</p>
@@ -601,11 +672,34 @@
   <div class="modal">
     <h3>設定</h3>
     <p>録音後に選択した範囲の音声だけが、文字起こしのためOpenAIのAPIに送信されます。元音声は処理と履歴保存の完了後に自動削除され、失敗時は再試行のため端末内に残ります。文字起こし結果と商談記録、APIキーはこの端末のブラウザ内に保存され、当アプリが独自のサーバーに会話データを保管することはありません。</p>
+
+    <div class="settings-block">
+      <p>このアプリは、保険用語に対応した辞書を持っています。<br>誤変換に気づいたときは、記録内の単語を選択すると報告できます。</p>
+      <button type="button" class="link-btn" id="reportFormLinkBtn">誤変換を報告する</button>
+    </div>
+
+    <div class="settings-block">
+      <p>ご質問・ご要望・不具合などは、こちらからお知らせください。</p>
+      <button type="button" class="link-btn" id="inquiryLinkBtn">お問い合わせ</button>
+    </div>
+
     <label class="fld" for="keyInput">OpenAI APIキー</label>
     <input class="key" type="password" id="keyInput" placeholder="sk-..." autocomplete="off">
     <label class="fld" for="sendMail">完成後の送信先メール（任意）</label>
     <input type="email" id="sendMail" placeholder="日報の提出先など" autocomplete="off">
     <p>コストは概算です。正確な請求はOpenAIのダッシュボードをご確認ください。</p>
+
+    <div class="settings-block user-dict-block">
+      <label class="fld" style="margin-top:0;">ユーザー辞書(この端末専用)</label>
+      <p class="user-dict-desc">よく出るお客様のお名前など、変換されてほしい表記を登録できます。</p>
+      <div class="user-dict-add">
+        <input type="text" id="userDictWrong" placeholder="誤った表記" autocomplete="off">
+        <input type="text" id="userDictRight" placeholder="正しい表記" autocomplete="off">
+        <button type="button" id="userDictAddBtn">追加</button>
+      </div>
+      <ul class="user-dict-list" id="userDictList"></ul>
+    </div>
+
     <div class="row">
       <button class="btn-cancel" id="cancelBtn">閉じる</button>
       <button class="btn-save" id="saveBtn">保存</button>
@@ -622,6 +716,9 @@
   const KEY = 'koememo_api_key';
   const MAIL = 'koememo_mail';
   const HIST = 'koememo_history_v2';
+  const USER_DICT = 'koememo_user_dict'; // ユーザー辞書(人名など、端末専用の個人辞書)
+  const ONBOARD_A = 'koememo_onboard_a_dismissed'; // 初回案内A(アプリ紹介)を閉じたか
+  const ONBOARD_B = 'koememo_onboard_b_dismissed'; // 初回案内B(辞書機能紹介)を閉じたか
 
   // ============================================================
   // ここが唯一の「フォーマット定義」箇所です。
@@ -1022,6 +1119,8 @@ REIT=不動産投資信託。読みは「リート」
         noticeEl=$('notice'), historyEl=$('history'), countEl=$('count'),
         completedCardBodyEl=$('completedCardBody'), completedTitleEl=$('completedTitle'),
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
+        userDictWrongEl=$('userDictWrong'), userDictRightEl=$('userDictRight'), userDictListEl=$('userDictList'),
+        onboardAEl=$('onboardA'), onboardBEl=$('onboardB'),
         toastEl=$('toast'), reportSelectionBtn=$('reportSelectionBtn'), consentCheck=$('consentCheck'),
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
         recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn'), recoveryTextEl=$('recoveryText'),
@@ -1736,6 +1835,48 @@ REIT=不動産投資信託。読みは「リート」
     return result;
   }
 
+  // ===== ユーザー辞書(人名など、端末ごとの個人辞書) =====
+  // 共通辞書(第2層exactReplace)とは別に、端末内だけで完結する個人用の置換テーブル。
+  // 他の端末・他のユーザーとは共有しない(仕様)。
+  function loadUserDict(){
+    try{
+      const list = JSON.parse(localStorage.getItem(USER_DICT) || '[]');
+      return Array.isArray(list) ? list : [];
+    }catch(e){ return []; }
+  }
+  function saveUserDict(list){ localStorage.setItem(USER_DICT, JSON.stringify(list)); }
+  function applyUserDictReplace(text){
+    let result = text;
+    for (const {wrong, right} of loadUserDict()){
+      if (wrong && result.includes(wrong)) result = result.split(wrong).join(right);
+    }
+    return result;
+  }
+  function renderUserDict(){
+    const list = loadUserDict();
+    if(!list.length){
+      userDictListEl.innerHTML = '<li class="user-dict-empty">まだ登録がありません。</li>';
+      return;
+    }
+    userDictListEl.innerHTML = '';
+    list.forEach((pair, idx) => {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.className = 'ud-pair';
+      span.textContent = `${pair.wrong} → ${pair.right}`;
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button'; delBtn.className = 'ud-del'; delBtn.textContent = '削除';
+      delBtn.onclick = () => {
+        const cur = loadUserDict();
+        cur.splice(idx, 1);
+        saveUserDict(cur);
+        renderUserDict();
+      };
+      li.appendChild(span); li.appendChild(delBtn);
+      userDictListEl.appendChild(li);
+    });
+  }
+
   // 1チャンク分をWhisperに送信する。直前チャンクの文字起こし末尾をpromptに連結し文脈をつなぐ。
   // 失敗してもchunkListからは削除せず、'failed'として保持する(最大MAX_RETRY回まで自動リトライ)。
   async function sendChunk(c){
@@ -1773,8 +1914,10 @@ REIT=不動産投資信託。読みは「リート」
       }
       const data = await res.json();
       const transcribed = (data.text||'').trim();
-      // メモモードでは保険用語辞書を適用しない(日常会話の誤変換を防ぐ)
-      c.text = sessionMode==='memo' ? transcribed : applyExactReplace(transcribed);
+      // メモモードでは保険用語辞書(第2層)を適用しない(日常会話の誤変換を防ぐ)。
+      // ユーザー辞書(人名など)は業種用語ではなく個人辞書のため、モードによらず上乗せで適用する。
+      const dictionaryApplied = sessionMode==='memo' ? transcribed : applyExactReplace(transcribed);
+      c.text = applyUserDictReplace(dictionaryApplied);
       c.status = 'done';
       await persistChunk(c); // AI整形と履歴保存が完了するまでは音声Blobも保持する
     }catch(e){
@@ -2111,6 +2254,8 @@ REIT=不動産投資信託。読みは「リート」
   // 長すぎる選択(100文字超)ではボタン自体を出さない。
   const REPORT_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfmSfBPkrITqRLPjTZgjjFDN0X5QhlSbGY0ioCc71fMG1HYFQ/viewform?usp=pp_url';
   const REPORT_FORM_ENTRY_WRONG = 'entry.1340100169';
+  // お問い合わせフォームのURL(未作成のプレースホルダー)。URL確定後はここだけ書き換える。
+  const INQUIRY_FORM_URL = '{{TOIAWASE_FORM_URL}}';
   const REPORT_SELECTION_MAX_LEN = 100;
   let reportSelectionText = '';
   document.addEventListener('selectionchange', () => {
@@ -2134,13 +2279,46 @@ REIT=不動産投資信託。読みは「リート」
     reportSelectionBtn.classList.remove('show');
   };
 
+  // ===== 初回案内(案内A→案内Bの順で、それぞれ初回のみ表示) =====
+  function showOnboardB(){
+    if(!localStorage.getItem(ONBOARD_B)) onboardBEl.classList.add('show');
+  }
+  function initOnboarding(){
+    if(!localStorage.getItem(ONBOARD_A)) onboardAEl.classList.add('show');
+    else showOnboardB();
+  }
+  $('onboardACloseBtn').onclick=()=>{
+    localStorage.setItem(ONBOARD_A,'1');
+    onboardAEl.classList.remove('show');
+    showOnboardB(); // 間を置かず続けて案内Bを表示する
+  };
+  $('onboardBCloseBtn').onclick=()=>{
+    localStorage.setItem(ONBOARD_B,'1');
+    onboardBEl.classList.remove('show');
+  };
+
   // ===== 設定 =====
   function openModal(){
     keyInput.value=localStorage.getItem(KEY)||'';
     mailInput.value=localStorage.getItem(MAIL)||'';
+    renderUserDict();
     modalBg.classList.add('show');
   }
   $('gearBtn').onclick=openModal;
+  // 誤変換報告フォームは既存の選択→報告と同じURLを使う(選択操作なしでも報告できる導線)
+  $('reportFormLinkBtn').onclick=()=>window.open(REPORT_FORM_URL,'_blank');
+  // お問い合わせフォームのURLは未確定のプレースホルダー({{TOIAWASE_FORM_URL}})。
+  // 確定後はINQUIRY_FORM_URLの定義(下記)を書き換えるだけでよい。
+  $('inquiryLinkBtn').onclick=()=>window.open(INQUIRY_FORM_URL,'_blank');
+  $('userDictAddBtn').onclick=()=>{
+    const wrong=userDictWrongEl.value.trim(), right=userDictRightEl.value.trim();
+    if(!wrong || !right){ toast('誤った表記と正しい表記の両方を入力してください'); return; }
+    const list=loadUserDict();
+    list.push({wrong,right});
+    saveUserDict(list);
+    userDictWrongEl.value=''; userDictRightEl.value='';
+    renderUserDict();
+  };
   $('cancelBtn').onclick=()=>modalBg.classList.remove('show');
   modalBg.onclick=e=>{ if(e.target===modalBg) modalBg.classList.remove('show'); };
   $('saveBtn').onclick=()=>{
@@ -2239,6 +2417,7 @@ REIT=不動産投資信託。読みは「リート」
   // ===== 初期化 =====
   renderHistory();
   checkForRecovery(); // 前回終了時に送信できていない録音が残っていないか確認する
+  initOnboarding();
   if(!localStorage.getItem(KEY)) setTimeout(openModal, 400);
 })();
 </script>
