@@ -70,6 +70,7 @@ const instrumented = match[1].replace(
     normalizeTrimValues,
     updateConsentUI, setMode,
     getRecordMode() { return recordMode; },
+    stop, showProcessingRing,
   };
 })();`
 );
@@ -111,6 +112,19 @@ api.setMode('business');
 assert.equal(api.getRecordMode(), 'business');
 assert.equal(element('modeBusinessBtn').classList.contains('active'), true);
 assert.equal(element('modeMemoBtn').classList.contains('active'), false);
+
+// 録音停止:トリミング画面が開くまでの間に「処理中」画面が一瞬映らないこと
+// (停止直後は直接トリミング表示用のtrim-reviewへ切り替わり、processingクラスは付けない)
+api.stop();
+assert.equal(element('clockCard').classList.contains('rec'), false, '停止後はrec状態を解除すべき');
+assert.equal(element('clockCard').classList.contains('processing'), false, '停止直後にprocessing(処理中表示)を出すべきではない');
+assert.equal(element('body').classList.contains('trim-review'), true, '停止直後にtrim-reviewへ切り替え、録音用UIを即座に隠すべき');
+assert.equal(element('body').classList.contains('dim-mode'), false, '停止後は暗表示(dim-mode)を解除すべき');
+
+// 処理中(送信・整形待ち)のリング表示:中央にスピナーを重ねず、外周(sweep)のみで表現すること
+api.showProcessingRing();
+assert.equal(element('clockCard').classList.contains('processing'), true, 'showProcessingRingはprocessingクラスを付けるべき');
+assert.ok(element('sweep').style.strokeDasharray, '処理中は外周(sweep)の弧の長さを設定すべき');
 
 api.setSelection(10, 9, 10);
 api.normalizeTrimValues('start');

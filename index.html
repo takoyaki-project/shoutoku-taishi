@@ -198,8 +198,16 @@
   .dial .sweep{
     fill:none;stroke:var(--accent);stroke-width:3;stroke-linecap:round;
     stroke-dasharray:1 999;opacity:0;transition:opacity .5s;
+    transform-box:fill-box;transform-origin:center;
   }
   .clock.rec .dial .sweep{opacity:1;}
+  /* 処理中(送信・整形待ち):中央に別のリングを重ねず、録音中と同じ外周の弧を
+     ぐるっと回転させるアニメーションで表現する(録音中の視覚表現に揃える)。
+     丸の塗り(緑背景)はそのまま維持するため、塗りと同化しないよう弧は白系にする。
+     弧の長さ(stroke-dasharray)はJS側でCIRC(円周長)を基準に設定する。 */
+  .clock.processing .dial .track{opacity:1;stroke:rgba(255,255,255,.35);}
+  .clock.processing .dial .sweep{opacity:1;stroke:#fff;animation:dial-spin 1s linear infinite;}
+  @keyframes dial-spin{to{transform:rotate(360deg);}}
   .dial .face{
     position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;
@@ -210,16 +218,9 @@
     font-variant-numeric:tabular-nums;line-height:1;
     display:none;
   }
-  /* 処理中(送信・整形待ち)は経過時間の代わりにローディングインジケーターを出す。
+  /* 処理中(送信・整形待ち)は経過時間の代わりに外周の回転アニメーションを出す。
      数字は円からはみ出して読めないうえ、処理中は経過時間に意味がないため。 */
   .clock.processing .time{display:none;}
-  .spinner{
-    display:none;width:38px;height:38px;border-radius:50%;
-    border:3px solid rgba(255,255,255,.3);border-top-color:#fff;
-    animation:spin .8s linear infinite;
-  }
-  .clock.processing .spinner{display:block;}
-  @keyframes spin{to{transform:rotate(360deg);}}
   .idle-prompt{
     display:flex;flex-direction:column;align-items:center;gap:10px;
     font-size:22px;font-weight:600;color:#fff;letter-spacing:.1em;
@@ -536,7 +537,7 @@
 
   @media (prefers-reduced-motion:reduce){
     .clock,.toast,.rec-dot,.report-selection-btn{transition:none;}
-    .spinner{animation:none;}
+    .clock.processing .dial .sweep{animation:none;}
   }
 </style>
 </head>
@@ -612,7 +613,6 @@
           </div>
           <div class="rec-label" id="recLabel"><span class="rec-dot" id="recDot" aria-hidden="true"></span><span id="recLabelText">録音中</span></div>
           <div class="time" id="elapsedTime">00:00:00</div>
-          <div class="spinner" aria-hidden="true"></div>
         </div>
       </div>
       <div class="state" id="state"></div>
@@ -731,6 +731,9 @@
   const USER_DICT = 'koememo_user_dict'; // ユーザー辞書(人名など、端末専用の個人辞書)
   const ONBOARD_A = 'koememo_onboard_a_dismissed'; // 初回案内A(アプリ紹介)を閉じたか
   const ONBOARD_B = 'koememo_onboard_b_dismissed'; // 初回案内B(辞書機能紹介)を閉じたか
+  // デザイン確認用の一時的な切り替え。trueの間は「閉じたら二度と出ない」判定を無視し、
+  // 毎回リロードのたびに案内A・Bを表示する。確認が終わったらfalseに戻すこと(恒久仕様ではない)。
+  const FORCE_SHOW_ONBOARDING = false;
 
   // ============================================================
   // ここが唯一の「フォーマット定義」箇所です。
@@ -1144,6 +1147,7 @@ REIT=不動産投資信託。読みは「リート」
         trimFullBtn=$('trimFullBtn'), trimDiscardBtn=$('trimDiscardBtn'), trimAudioEl=$('trimAudio');
 
   const R = 101, CIRC = 2 * Math.PI * R;
+  const PROCESSING_ARC_LEN = CIRC / 5; // 処理中に外周を回転する弧の長さ(円周の約1/5)
   const CHUNK_MS = 2 * 60 * 1000; // 突然終了時の損失を最大約2分に抑えるため、2分ごとに確定保存する
   const CHUNK_SIZE_SOFT_LIMIT = 20 * 1024 * 1024; // 送信上限(24MB)に達する前に、時間を待たず早めにチャンクを区切る
 
@@ -1347,7 +1351,7 @@ REIT=不動産投資信託。読みは「リート」
     }else{
       elapsedTimeEl.textContent = fmtLongTime(lastDuration); // 円に表示する経過時間を、復旧した録音長に合わせておく
       stateEl.textContent = '処理中…';
-      clockCard.classList.add('processing');
+      showProcessingRing();
       await finalizeSession();
     }
   }
@@ -1362,6 +1366,13 @@ REIT=不動産投資信託。読みは「リート」
     sweepEl.style.strokeDasharray = `${len} ${CIRC}`;
   }
   setInterval(updateSweep, 250);
+
+  // 処理中(送信・整形待ち)の見た目:中央にリングを重ねず、録音中と同じ外周の弧を
+  // 固定長にして、CSSアニメーション(dial-spin)でぐるっと回転させる。
+  function showProcessingRing(){
+    clockCard.classList.add('processing');
+    sweepEl.style.strokeDasharray = `${PROCESSING_ARC_LEN} ${CIRC}`;
+  }
 
   // ===== 録音フォーマット判定 =====
   function pickMime(){
@@ -1493,8 +1504,10 @@ REIT=不動産投資信託。読みは「リート」
     clockCard.classList.remove('rec');
     document.body.classList.remove('dim-mode'); // フェーズ2(処理中)は通常表示に戻す
     sweepEl.style.strokeDasharray = `1 ${CIRC}`;
-    stateEl.textContent = '処理中…';
-    clockCard.classList.add('processing');
+    // 停止直後はまだ何も送信していない(トリミング確認が先)ため、「処理中」表示は出さない。
+    // trim-reviewをここで先に付けて録音用UI(.step-record)を即座に隠し、
+    // 実際にトリミング画面が表示されるまでの間に処理中画面が一瞬映るのを防ぐ。
+    document.body.classList.add('trim-review');
     if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
     if(stream){ stream.getTracks().forEach(t=>t.stop()); }
   }
@@ -1801,7 +1814,7 @@ REIT=不動産投資信託。読みは「リート」
       document.body.classList.remove('trim-review');
       elapsedTimeEl.textContent = fmtLongTime(lastDuration); // 円に表示する経過時間を、選択した範囲の長さに合わせておく
       stateEl.textContent='処理中…';
-      clockCard.classList.add('processing');
+      showProcessingRing();
       await finalizeSession();
     }catch(e){
       chunkList=originalChunks;sessionPhase='reviewing';
@@ -1977,7 +1990,7 @@ REIT=不動産投資信託。読みは「リート」
     if(blockingPending.length>0){
       awaitingRetry = true; // オンライン復帰時に自動再送信の対象とする
       stateEl.textContent = '処理中…';
-      clockCard.classList.add('processing');
+      showProcessingRing();
       const authFailed = blockingPending.some(c=>c.authError);
       let msg;
       if(authFailed){
@@ -2292,10 +2305,10 @@ REIT=不動産投資信託。読みは「リート」
 
   // ===== 初回案内(案内A→案内Bの順で、それぞれ初回のみ表示) =====
   function showOnboardB(){
-    if(!localStorage.getItem(ONBOARD_B)) onboardBEl.classList.add('show');
+    if(FORCE_SHOW_ONBOARDING || !localStorage.getItem(ONBOARD_B)) onboardBEl.classList.add('show');
   }
   function initOnboarding(){
-    if(!localStorage.getItem(ONBOARD_A)){
+    if(FORCE_SHOW_ONBOARDING || !localStorage.getItem(ONBOARD_A)){
       // ヘッダー(タイトル・歯車)を覆わないよう、実際のヘッダー高さの直下に表示する
       const header = document.querySelector('header');
       if(header) onboardAEl.style.top = (header.getBoundingClientRect().bottom + 10) + 'px';
