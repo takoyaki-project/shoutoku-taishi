@@ -88,10 +88,11 @@
 
   /* ---- 初回案内A・B共通:大きさ・位置は別々だが、背景色のトーン(淡いグリーン)だけ揃える ---- */
   /* 案内B: 設定アイコンを指す吹き出し(辞書機能の紹介)。大きさ・位置は変更せず、
-     背景色だけ黒から淡いグリーン(--top-soft、案内Aと同じトークン)に変更する。 */
+     背景色だけ黒から淡いグリーン(案内Aと同じ不透明色)に変更する。
+     --top-softは半透明トークンで背後の文字が透けてしまうため、ここでは使わない。 */
   .onboard-msg{
     display:none;z-index:15;
-    background:var(--top-soft);color:var(--ink);border-radius:14px;
+    background:#E5ECEA;color:var(--ink);border-radius:14px;
     padding:16px 36px 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,.22);
   }
   .onboard-msg.show{display:block;}
@@ -107,12 +108,12 @@
   }
   #onboardB::before{
     content:'';position:absolute;top:-6px;right:18px;
-    width:12px;height:12px;background:var(--top-soft);transform:rotate(45deg);
+    width:12px;height:12px;background:#E5ECEA;transform:rotate(45deg);
   }
 
   /* 案内A: アプリ全体の自己紹介。警告的な黒背景オーバーレイにはせず、
      画面の最前面・中央に、大きなフォントで堂々と表示する。
-     Bと同じ--top-soft/--inkトークンを使うことで、背景色のトーンだけ揃える。 */
+     案内Bと同じ不透明色(#E5ECEA)を使うことで、背景色のトーンだけ揃える。 */
   .onboard-a-overlay{
     display:none;position:fixed;inset:0;z-index:16;
     align-items:center;justify-content:center;padding:24px;
@@ -120,8 +121,6 @@
   .onboard-a-overlay.show{display:flex;}
   .onboard-a-card{
     position:relative;width:min(380px, 100%);
-    /* --top-softは半透明トークン(下地が透ける)のため、Aは常に背景ページの上に
-       直接乗る想定で、同じトーンを不透明色に起こしたものを使う(下に何があっても濁らない)。 */
     background:#E5ECEA;border:1px solid var(--top-line);border-radius:20px;
     padding:34px 30px 30px;
     box-shadow:0 20px 50px rgba(0,0,0,.22);
