@@ -86,34 +86,36 @@
   }
   .gear svg{width:22px;height:22px;}
 
-  /* ---- 初回案内A(トップページ:アプリ全体の紹介) ---- */
-  .onboard-banner{
-    display:none;position:relative;background:var(--accent-soft);
-    border:1px solid var(--top-line);border-radius:14px;
-    padding:14px 36px 14px 16px;margin:0 6px 12px;
+  /* ---- 初回案内A・B共通:同じ見た目のルール(濃色カード)で統一する ---- */
+  .onboard-msg{
+    display:none;z-index:15;
+    background:var(--ink);color:var(--paper);border-radius:14px;
+    padding:16px 36px 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,.22);
   }
-  .onboard-banner.show{display:block;}
-  .onboard-banner p{font-size:13px;line-height:1.8;color:var(--ink);margin:0;}
-  .onboard-close{
+  .onboard-msg.show{display:block;}
+  .onboard-msg p{font-size:13px;line-height:1.8;color:var(--paper);margin:0;position:relative;}
+  .onboard-msg .onboard-close{
     position:absolute;top:6px;right:6px;background:none;border:none;
-    color:var(--muted);font-size:18px;line-height:1;width:28px;height:28px;
+    color:var(--paper);opacity:.75;font-size:18px;line-height:1;width:28px;height:28px;
     cursor:pointer;display:flex;align-items:center;justify-content:center;
   }
 
-  /* ---- 初回案内B(設定アイコン付近の吹き出し:辞書機能の紹介) ---- */
-  .onboard-tooltip{
-    display:none;position:absolute;top:52px;right:6px;z-index:15;
-    width:min(272px, calc(100vw - 48px));
-    background:var(--ink);color:var(--paper);border-radius:12px;
-    padding:14px 32px 14px 14px;box-shadow:0 8px 24px rgba(0,0,0,.22);
+  /* 案内A: アプリ全体の紹介。「1|同意」の上に挟み込まず、画面上部にオーバーレイでどーんと表示する。
+     topの値はヘッダーの実際の高さに合わせてJS側で上書きする(このtopはJS実行前の暫定値)。 */
+  #onboardA{
+    position:fixed;left:50%;top:70px;transform:translateX(-50%);
+    width:min(340px, calc(100% - 32px));
   }
-  .onboard-tooltip.show{display:block;}
-  .onboard-tooltip::before{
+
+  /* 案内B: 設定アイコンを指す吹き出し(辞書機能の紹介)。位置と矢印はそのまま維持する */
+  #onboardB{
+    position:absolute;top:52px;right:6px;
+    width:min(272px, calc(100vw - 48px));
+  }
+  #onboardB::before{
     content:'';position:absolute;top:-6px;right:18px;
     width:12px;height:12px;background:var(--ink);transform:rotate(45deg);
   }
-  .onboard-tooltip p{font-size:13px;line-height:1.8;margin:0;position:relative;}
-  .onboard-tooltip .onboard-close{color:var(--paper);opacity:.75;}
 
   /* ---- 設定画面:辞書説明・お問い合わせ等のリンク導線 ---- */
   .settings-block{margin:16px 0;}
@@ -467,10 +469,15 @@
   }
 
   /* ---- 設定モーダル ---- */
+  /* モーダル表示中は背景(body)のスクロールを止め、モーダル内だけが独立してスクロールするようにする。
+     こうしないと、モーダル上部を見ようとした引っ張り操作がブラウザのpull-to-refreshとして
+     暴発し、設定内容が見られなくなる不具合があった。 */
+  body.modal-open{overflow:hidden;}
   .modal-bg{
     position:fixed;inset:0;background:rgba(40,45,42,.4);
     display:none;align-items:flex-end;justify-content:center;z-index:10;
     backdrop-filter:blur(2px);
+    overscroll-behavior:contain;
   }
   .modal-bg.show{display:flex;}
   .modal{
@@ -478,6 +485,11 @@
     width:100%;max-width:520px;
     padding:26px 22px calc(30px + env(safe-area-inset-bottom));
     box-shadow:0 -8px 40px rgba(0,0,0,.12);
+    max-height:calc(100vh - 24px);
+    max-height:calc(100dvh - 24px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
   }
   .modal h3{font-size:16px;margin-bottom:6px;}
   .modal p{font-size:15px;color:var(--muted);line-height:1.85;margin-bottom:14px;}
@@ -543,7 +555,7 @@
       </svg>
     </button>
     <!-- 初回案内B:辞書機能の紹介(案内Aを閉じた直後に表示する吹き出し) -->
-    <div class="onboard-tooltip" id="onboardB">
+    <div class="onboard-msg" id="onboardB">
       <p>このアプリは、保険用語に対応した辞書を持っていますが、まだ完璧ではありません。誤変換に気づいたときは、その単語を選択すると「報告」できます。よく出るお客様のお名前などは、ご自身で登録できるユーザー辞書があります。</p>
       <button type="button" class="onboard-close" id="onboardBCloseBtn" aria-label="閉じる">×</button>
     </div>
@@ -551,7 +563,7 @@
   <div class="header-line"></div>
 
   <!-- 初回案内A:アプリ全体の紹介(初回のみ表示) -->
-  <div class="onboard-banner" id="onboardA">
+  <div class="onboard-msg" id="onboardA">
     <p>このアプリは、保険商談を録音するだけで、AIが自動で文字起こし・要約し、提出できる記録に仕上げます。<br>録音データは端末内にのみ保存され、外部のサーバーに保管されることはありません。</p>
     <button type="button" class="onboard-close" id="onboardACloseBtn" aria-label="閉じる">×</button>
   </div>
@@ -2283,8 +2295,14 @@ REIT=不動産投資信託。読みは「リート」
     if(!localStorage.getItem(ONBOARD_B)) onboardBEl.classList.add('show');
   }
   function initOnboarding(){
-    if(!localStorage.getItem(ONBOARD_A)) onboardAEl.classList.add('show');
-    else showOnboardB();
+    if(!localStorage.getItem(ONBOARD_A)){
+      // ヘッダー(タイトル・歯車)を覆わないよう、実際のヘッダー高さの直下に表示する
+      const header = document.querySelector('header');
+      if(header) onboardAEl.style.top = (header.getBoundingClientRect().bottom + 10) + 'px';
+      onboardAEl.classList.add('show');
+    }else{
+      showOnboardB();
+    }
   }
   $('onboardACloseBtn').onclick=()=>{
     localStorage.setItem(ONBOARD_A,'1');
@@ -2297,11 +2315,18 @@ REIT=不動産投資信託。読みは「リート」
   };
 
   // ===== 設定 =====
+  // モーダル表示中はbodyのスクロールを止め、モーダル内(.modal)だけが独立してスクロールするようにする
+  // (背景のpull-to-refreshが暴発して設定内容が見られなくなる不具合の対策)。
   function openModal(){
     keyInput.value=localStorage.getItem(KEY)||'';
     mailInput.value=localStorage.getItem(MAIL)||'';
     renderUserDict();
     modalBg.classList.add('show');
+    document.body.classList.add('modal-open');
+  }
+  function closeModal(){
+    modalBg.classList.remove('show');
+    document.body.classList.remove('modal-open');
   }
   $('gearBtn').onclick=openModal;
   // 誤変換報告フォームは既存の選択→報告と同じURLを使う(選択操作なしでも報告できる導線)
@@ -2318,14 +2343,14 @@ REIT=不動産投資信託。読みは「リート」
     userDictWrongEl.value=''; userDictRightEl.value='';
     renderUserDict();
   };
-  $('cancelBtn').onclick=()=>modalBg.classList.remove('show');
-  modalBg.onclick=e=>{ if(e.target===modalBg) modalBg.classList.remove('show'); };
+  $('cancelBtn').onclick=closeModal;
+  modalBg.onclick=e=>{ if(e.target===modalBg) closeModal(); };
   $('saveBtn').onclick=()=>{
     const k=keyInput.value.trim(), m=mailInput.value.trim();
     if(k && !k.startsWith('sk-')){ toast('「sk-」で始まるキーを入力してください'); return; }
     k?localStorage.setItem(KEY,k):localStorage.removeItem(KEY);
     m?localStorage.setItem(MAIL,m):localStorage.removeItem(MAIL);
-    modalBg.classList.remove('show');
+    closeModal();
     toast('保存しました');
     renderHistory();
   };
@@ -2356,7 +2381,7 @@ REIT=不動産投資信託。読みは「リート」
     recoveryCardEl.style.display = 'none';
     pauseCardEl.style.display = 'none';
     resetState();
-    modalBg.classList.remove('show');
+    closeModal();
     toast('未送信データを削除しました');
   };
 
