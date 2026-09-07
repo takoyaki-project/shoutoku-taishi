@@ -685,16 +685,6 @@
     <h3>設定</h3>
     <p>録音後に選択した範囲の音声だけが、文字起こしのためOpenAIのAPIに送信されます。元音声は処理と履歴保存の完了後に自動削除され、失敗時は再試行のため端末内に残ります。文字起こし結果と商談記録、APIキーはこの端末のブラウザ内に保存され、当アプリが独自のサーバーに会話データを保管することはありません。</p>
 
-    <div class="settings-block">
-      <p>このアプリは、保険用語に対応した辞書を持っています。<br>誤変換に気づいたときは、記録内の単語を選択すると報告できます。</p>
-      <button type="button" class="link-btn" id="reportFormLinkBtn">誤変換を報告する</button>
-    </div>
-
-    <div class="settings-block">
-      <p>ご質問・ご要望・不具合などは、こちらからお知らせください。</p>
-      <button type="button" class="link-btn" id="inquiryLinkBtn">お問い合わせ</button>
-    </div>
-
     <label class="fld" for="keyInput">OpenAI APIキー</label>
     <input class="key" type="password" id="keyInput" placeholder="sk-..." autocomplete="off">
     <label class="fld" for="sendMail">完成後の送信先メール（任意）</label>
@@ -710,6 +700,16 @@
         <button type="button" id="userDictAddBtn">追加</button>
       </div>
       <ul class="user-dict-list" id="userDictList"></ul>
+    </div>
+
+    <div class="settings-block">
+      <p>このアプリは、保険用語に対応した辞書を持っています。<br>誤変換に気づいたときは、記録内の単語を選択すると報告できます。</p>
+      <button type="button" class="link-btn" id="reportFormLinkBtn">誤変換を報告する</button>
+    </div>
+
+    <div class="settings-block">
+      <p>ご質問・ご要望・不具合などは、こちらからお知らせください。</p>
+      <button type="button" class="link-btn" id="inquiryLinkBtn">お問い合わせ</button>
     </div>
 
     <div class="row">
