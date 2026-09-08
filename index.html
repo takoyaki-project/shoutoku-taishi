@@ -225,13 +225,20 @@
   /* 処理中(送信・整形待ち):波紋(輪が広がって消える)表現は、視線を外側へ誘導する
      動きのため見ていて酔うような不快感があると判明したため廃止。
      代わりに、瞑想・呼吸法アプリで一般的な「ゆっくり伸縮する円」にする。
-     丸全体を中心軸で10〜15%程度ゆっくり拡大縮小させ、拡大時にわずかに濃い色
-     (--accent-strong)、縮小時に基準色(--accent)へ、同じタイミングで連動させる。
-     視線誘導がなく、対称的な動きのため不快感が生じにくい。 */
-  .clock.processing .dial{animation:dial-breathe 7s ease-in-out infinite;}
+     丸全体を中心軸で10〜15%程度ゆっくり拡大縮小させ、色の濃淡も同じタイミングで
+     連動させる。視線誘導がなく、対称的な動きのため不快感が生じにくい。
+     圧迫感を抑えるため、処理中だけ丸自体のサイズを縮小する(録音中の見た目は
+     変更しない)。サイズ感を見て調整したい場合は、このwidth/heightの値だけ
+     変えればよい。色は「今の濃い緑(--accent)」より薄いトーンを基準にし、
+     濃淡の変化幅もはっきり分かるよう広げる(薄いdim-mode用の--accent値↔
+     通常の--accent値の間で変化させる)。 */
+  .clock.processing .dial{
+    width:160px;height:160px;
+    animation:dial-breathe 7s ease-in-out infinite;
+  }
   @keyframes dial-breathe{
-    0%,100%{transform:scale(1);background-color:var(--accent);}
-    50%{transform:scale(1.12);background-color:var(--accent-strong);}
+    0%,100%{transform:scale(1);background-color:#4C7B74;}
+    50%{transform:scale(1.12);background-color:var(--accent);}
   }
   /* 録音の経過時間(HH:MM:SS)。録音前は時刻の代わりに「録音開始」を表示するボタンとして機能する */
   .time{
@@ -373,20 +380,22 @@
   .trim-card.show{display:block;}
   .trim-card h2{font-size:17px;margin-bottom:4px;}
   .trim-lead{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:6px;}
-  /* 開始・終了の現在値。ドラッグ中もハンドルの吹き出しとは別に、常時ここで確認できる */
-  .trim-readout{display:flex;justify-content:space-between;margin-bottom:4px;}
+  /* 開始・終了の現在値。ドラッグ中もハンドルの吹き出しとは別に、常時ここで確認できる。
+     視認性を優先し、はっきり読める大きさにする。 */
+  .trim-readout{display:flex;justify-content:space-between;margin-bottom:6px;}
   .trim-readout-item{display:flex;align-items:baseline;gap:6px;}
-  .trim-readout-label{font-size:12px;color:var(--muted);}
-  .trim-readout-time{font-size:16px;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink);}
-  /* 波形バー+開始/終了ハンドル。ハンドルの吹き出し分の余白を上に確保する */
-  .wave-wrap{position:relative;height:48px;margin:32px 0 10px;}
+  .trim-readout-label{font-size:13px;color:var(--muted);}
+  .trim-readout-time{font-size:21px;font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink);}
+  /* 波形バー+開始/終了ハンドル。ハンドルの吹き出し分の余白を上に確保する。
+     波形が見やすいよう、余白を削るより高さを優先して確保する(48px→76px)。 */
+  .wave-wrap{position:relative;height:76px;margin:32px 0 10px;}
   .wave-canvas-clip{
     position:absolute;inset:0;border-radius:12px;overflow:hidden;
     background:var(--paper);border:1px solid var(--line);
   }
   .wave-canvas-clip canvas{width:100%;height:100%;display:block;}
   .trim-range-native{display:none;}
-  /* ハンドル:見た目のつまみ(10px)は細いが、実際のドラッグ判定領域は44px確保する */
+  /* ハンドル:見た目のつまみ(12px)は細いが、実際のドラッグ判定領域は44px確保する */
   .trim-handle{
     position:absolute;top:-4px;bottom:-4px;left:0;width:44px;margin-left:-22px;
     display:flex;align-items:center;justify-content:center;
@@ -394,7 +403,7 @@
   }
   .trim-handle:active{cursor:grabbing;}
   .trim-handle-grip{
-    width:10px;height:100%;border-radius:5px;
+    width:12px;height:100%;border-radius:6px;
     background:var(--accent);box-shadow:0 0 0 2px var(--card);
     pointer-events:none;
   }
@@ -1813,7 +1822,11 @@ REIT=不動産投資信託。読みは「リート」
       const from=Math.floor(x/w*samples.length),to=Math.min(samples.length,from+step);
       let peak=.05;
       for(let i=from;i<to;i++) peak=Math.max(peak,samples[i]||0);
-      const amp=Math.max(1,peak*(h*.42));
+      // 通常の会話音量ではpeakが小さく、そのままだと振幅がほとんど見えず
+      // 波形が「潰れて」見えてしまうため、べき乗カーブで小さい値を持ち上げる
+      // (peak=1のときは変化なし、peak=0.1でも約0.25まで持ち上がる)。
+      const boosted=Math.pow(peak,0.6);
+      const amp=Math.max(1.5,boosted*(h*.42));
       ctx.moveTo(x,mid-amp);ctx.lineTo(x,mid+amp);
     }
     ctx.stroke();
