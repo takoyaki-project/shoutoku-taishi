@@ -70,7 +70,7 @@ const instrumented = match[1].replace(
     normalizeTrimValues,
     updateConsentUI, setMode,
     getRecordMode() { return recordMode; },
-    stop, showProcessingRing,
+    stop, showProcessingState,
   };
 })();`
 );
@@ -121,10 +121,10 @@ assert.equal(element('clockCard').classList.contains('processing'), false, '停�
 assert.equal(element('body').classList.contains('trim-review'), true, '停止直後にtrim-reviewへ切り替え、録音用UIを即座に隠すべき');
 assert.equal(element('body').classList.contains('dim-mode'), false, '停止後は暗表示(dim-mode)を解除すべき');
 
-// 処理中(送信・整形待ち)のリング表示:中央にスピナーを重ねず、外周(sweep)のみで表現すること
-api.showProcessingRing();
-assert.equal(element('clockCard').classList.contains('processing'), true, 'showProcessingRingはprocessingクラスを付けるべき');
-assert.ok(element('sweep').style.strokeDasharray, '処理中は外周(sweep)の弧の長さを設定すべき');
+// 処理中(送信・整形待ち)の見た目切り替え:.clock.processingが付き、CSS側の
+// 波紋アニメーションが描画される状態になること
+api.showProcessingState();
+assert.equal(element('clockCard').classList.contains('processing'), true, 'showProcessingStateはprocessingクラスを付けるべき');
 
 api.setSelection(10, 9, 10);
 api.normalizeTrimValues('start');

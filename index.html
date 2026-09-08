@@ -218,28 +218,30 @@
     transform-box:fill-box;transform-origin:center;
   }
   .clock.rec .dial .sweep{opacity:1;}
-  /* 処理中(送信・整形待ち):中央に別のリングを重ねず、録音中と同じ外周の弧を
-     ぐるっと回転させるアニメーションで表現する(録音中の視覚表現に揃える)。
-     丸の塗り(緑背景)はそのまま維持するため、塗りと同化しないよう弧は白系にする。
-     弧が一定速度で回るだけだと「一周したら終わる進捗表示」に見えて誤解を招くため、
-     弧の長さ自体も伸び縮みさせる(不定形スピナーの定番パターン)。これにより、
-     処理が完了して画面が切り替わるタイミングが弧の一周と無関係でも、
-     「たまたま半端な位置で止まった」ようには見えなくなる。
-     stroke-dasharrayの数値はCIRC(円周長、約635)を基準にした固定値。 */
-  .clock.processing .dial .track{opacity:1;stroke:rgba(255,255,255,.35);}
-  .clock.processing .dial .sweep{
-    opacity:1;stroke:#fff;
-    animation:dial-spin 1.6s linear infinite, dial-dash 1.6s ease-in-out infinite;
-  }
-  @keyframes dial-spin{to{transform:rotate(360deg);}}
-  @keyframes dial-dash{
-    0%{stroke-dasharray:15 620;stroke-dashoffset:0;}
-    50%{stroke-dasharray:245 620;stroke-dashoffset:-150;}
-    100%{stroke-dasharray:15 620;stroke-dashoffset:-635;}
-  }
   .dial .face{
     position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;
+  }
+  /* 処理中(送信・整形待ち):丸の外周が回転する表現は「一周したら終わる進捗表示」に
+     見えて誤解を招き、実際には一部しか動かず中途半端な印象にもなったため廃止。
+     代わりに、丸の内部で水面の波紋のように輪が中心から広がって消える表現にする。
+     終わりの見えない待機であることが伝わり、処理がどのタイミングで完了しても
+     不自然に見えない。丸の塗り(緑背景)はそのまま維持する。 */
+  .dial .ripple{
+    display:none;position:absolute;inset:0;overflow:hidden;border-radius:50%;
+  }
+  .clock.processing .dial .ripple{display:block;}
+  .dial .ripple span{
+    position:absolute;top:50%;left:50%;width:30%;height:30%;border-radius:50%;
+    border:2px solid rgba(255,255,255,.55);
+    transform:translate(-50%,-50%) scale(0);opacity:0;
+    animation:dial-ripple 2.4s ease-out infinite;
+  }
+  .dial .ripple span:nth-child(2){animation-delay:.8s;}
+  .dial .ripple span:nth-child(3){animation-delay:1.6s;}
+  @keyframes dial-ripple{
+    0%{transform:translate(-50%,-50%) scale(0);opacity:.55;}
+    100%{transform:translate(-50%,-50%) scale(3.2);opacity:0;}
   }
   /* 録音の経過時間(HH:MM:SS)。録音前は時刻の代わりに「録音開始」を表示するボタンとして機能する */
   .time{
@@ -247,7 +249,7 @@
     font-variant-numeric:tabular-nums;line-height:1;
     display:none;
   }
-  /* 処理中(送信・整形待ち)は経過時間の代わりに外周の回転アニメーションを出す。
+  /* 処理中(送信・整形待ち)は経過時間の代わりに波紋アニメーションを出す。
      数字は円からはみ出して読めないうえ、処理中は経過時間に意味がないため。 */
   .clock.processing .time{display:none;}
   .idle-prompt{
@@ -344,6 +346,10 @@
   body.trim-review .step-record{
     display:none;
   }
+  /* トリミング画面は要素が多く縦に長くなりがちなため、画面上下の余白を切り詰めて
+     スクロールなしで1画面に収まるようにする(ヘッダー等が隠れて.trim-cardだけが
+     表示される状態なので、ここだけ余白を詰めても他画面に影響しない)。 */
+  body.trim-review .app{padding:6px 16px 10px;}
 
   /* ---- 完成直後の結果専用画面(改善1):録音カード等を隠し、完成した記録だけを表示する ---- */
   body.record-done header,
@@ -367,39 +373,41 @@
   }
   .record-close-btn:active{background:var(--accent-strong);}
 
-  /* ---- 録音後の送信範囲確認 ---- */
+  /* ---- 録音後の送信範囲確認 ----
+     1画面に収めるため、タップ領域(44px以上)は維持しつつ、要素間の余白・
+     波形の高さ・行間を切り詰めている。 */
   .trim-card{
     display:none;background:var(--card);border:1px solid var(--line);
-    border-radius:var(--radius);padding:22px 18px;margin-top:8px;
+    border-radius:var(--radius);padding:12px 16px;margin-top:4px;
   }
   .trim-card.show{display:block;}
-  .trim-card h2{font-size:18px;margin-bottom:8px;}
-  .trim-lead{font-size:15px;color:var(--muted);line-height:1.7;margin-bottom:18px;}
+  .trim-card h2{font-size:17px;margin-bottom:4px;}
+  .trim-lead{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:6px;}
   .wave-wrap{
-    position:relative;height:96px;border-radius:12px;overflow:hidden;
-    background:var(--paper);border:1px solid var(--line);margin-bottom:18px;
+    position:relative;height:48px;border-radius:12px;overflow:hidden;
+    background:var(--paper);border:1px solid var(--line);margin-bottom:10px;
   }
   .wave-wrap canvas{width:100%;height:100%;display:block;}
-  .trim-field{margin:15px 0;}
-  .trim-field-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-  .trim-field label{font-size:14px;color:var(--muted);}
-  .trim-time{font-size:18px;font-variant-numeric:tabular-nums;font-weight:600;}
+  .trim-field{margin:8px 0;}
+  .trim-field-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+  .trim-field label{font-size:13px;color:var(--muted);}
+  .trim-time{font-size:16px;font-variant-numeric:tabular-nums;font-weight:600;}
   .trim-range{width:100%;accent-color:var(--accent);min-height:32px;}
-  .trim-nudge{display:flex;gap:8px;margin-top:7px;}
+  .trim-nudge{display:flex;gap:8px;margin-top:5px;}
   .trim-nudge button{
     min-height:44px;flex:1;border:1px solid var(--line);border-radius:10px;
     background:var(--paper);color:var(--ink);font-size:14px;cursor:pointer;
   }
   .trim-summary{
-    margin:18px 0 14px;padding:12px 14px;border-radius:12px;
-    background:var(--accent-soft);font-size:14px;color:var(--accent);line-height:1.7;
+    margin:6px 0;padding:7px 14px;border-radius:12px;
+    background:var(--accent-soft);font-size:13px;color:var(--accent);line-height:1.5;
   }
   .trim-preview{
-    width:100%;min-height:48px;border:1px solid var(--accent-soft);border-radius:12px;
+    width:100%;min-height:44px;border:1px solid var(--accent-soft);border-radius:12px;
     background:none;color:var(--accent);font-size:14px;font-weight:600;cursor:pointer;
   }
-  .trim-actions{display:grid;gap:10px;margin-top:14px;}
-  .trim-actions button{min-height:50px;border-radius:13px;font-size:14px;cursor:pointer;}
+  .trim-actions{display:grid;gap:6px;margin-top:8px;}
+  .trim-actions button{min-height:46px;border-radius:13px;font-size:14px;cursor:pointer;}
   .trim-confirm{border:none;background:var(--accent);color:#fff;font-weight:600;}
   .trim-confirm:active{background:var(--accent-strong);}
   .trim-full{border:1px solid var(--line);background:none;color:var(--muted);}
@@ -566,7 +574,9 @@
 
   @media (prefers-reduced-motion:reduce){
     .clock,.toast,.rec-dot,.report-selection-btn{transition:none;}
-    .clock.processing .dial .sweep{animation:none;}
+    .dial .ripple span{
+      animation:none;opacity:.4;transform:translate(-50%,-50%) scale(1.6);
+    }
   }
 </style>
 </head>
@@ -632,6 +642,7 @@
           <circle class="track" cx="107" cy="107" r="101"></circle>
           <circle class="sweep" id="sweep" cx="107" cy="107" r="101"></circle>
         </svg>
+        <div class="ripple" aria-hidden="true"><span></span><span></span><span></span></div>
         <div class="face">
           <div class="idle-prompt" id="idlePrompt">
             <svg class="mic-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1178,7 +1189,6 @@ REIT=不動産投資信託。読みは「リート」
         trimFullBtn=$('trimFullBtn'), trimDiscardBtn=$('trimDiscardBtn'), trimAudioEl=$('trimAudio');
 
   const R = 101, CIRC = 2 * Math.PI * R;
-  const PROCESSING_ARC_LEN = CIRC / 5; // 処理中に外周を回転する弧の長さ(円周の約1/5)
   const CHUNK_MS = 2 * 60 * 1000; // 突然終了時の損失を最大約2分に抑えるため、2分ごとに確定保存する
   const CHUNK_SIZE_SOFT_LIMIT = 20 * 1024 * 1024; // 送信上限(24MB)に達する前に、時間を待たず早めにチャンクを区切る
 
@@ -1382,7 +1392,7 @@ REIT=不動産投資信託。読みは「リート」
     }else{
       elapsedTimeEl.textContent = fmtLongTime(lastDuration); // 円に表示する経過時間を、復旧した録音長に合わせておく
       stateEl.textContent = '処理中…';
-      showProcessingRing();
+      showProcessingState();
       await finalizeSession();
     }
   }
@@ -1398,11 +1408,11 @@ REIT=不動産投資信託。読みは「リート」
   }
   setInterval(updateSweep, 250);
 
-  // 処理中(送信・整形待ち)の見た目:中央にリングを重ねず、録音中と同じ外周の弧を
-  // 固定長にして、CSSアニメーション(dial-spin)でぐるっと回転させる。
-  function showProcessingRing(){
+  // 処理中(送信・整形待ち)の見た目に切り替える。見た目自体は.clock.processingに
+  // 対応するCSS(丸の内部で波紋が広がって消える表現)で描画されるため、ここでは
+  // クラス付与のみ行う。
+  function showProcessingState(){
     clockCard.classList.add('processing');
-    sweepEl.style.strokeDasharray = `${PROCESSING_ARC_LEN} ${CIRC}`;
   }
 
   // ===== 録音フォーマット判定 =====
@@ -1845,7 +1855,7 @@ REIT=不動産投資信託。読みは「リート」
       document.body.classList.remove('trim-review');
       elapsedTimeEl.textContent = fmtLongTime(lastDuration); // 円に表示する経過時間を、選択した範囲の長さに合わせておく
       stateEl.textContent='処理中…';
-      showProcessingRing();
+      showProcessingState();
       await finalizeSession();
     }catch(e){
       chunkList=originalChunks;sessionPhase='reviewing';
@@ -2021,7 +2031,7 @@ REIT=不動産投資信託。読みは「リート」
     if(blockingPending.length>0){
       awaitingRetry = true; // オンライン復帰時に自動再送信の対象とする
       stateEl.textContent = '処理中…';
-      showProcessingRing();
+      showProcessingState();
       const authFailed = blockingPending.some(c=>c.authError);
       let msg;
       if(authFailed){
