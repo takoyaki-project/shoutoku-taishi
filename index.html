@@ -222,26 +222,16 @@
     position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;
   }
-  /* 処理中(送信・整形待ち):丸の外周が回転する表現は「一周したら終わる進捗表示」に
-     見えて誤解を招き、実際には一部しか動かず中途半端な印象にもなったため廃止。
-     代わりに、丸の内部で水面の波紋のように輪が中心から広がって消える表現にする。
-     終わりの見えない待機であることが伝わり、処理がどのタイミングで完了しても
-     不自然に見えない。丸の塗り(緑背景)はそのまま維持する。 */
-  .dial .ripple{
-    display:none;position:absolute;inset:0;overflow:hidden;border-radius:50%;
-  }
-  .clock.processing .dial .ripple{display:block;}
-  .dial .ripple span{
-    position:absolute;top:50%;left:50%;width:30%;height:30%;border-radius:50%;
-    border:2px solid rgba(255,255,255,.55);
-    transform:translate(-50%,-50%) scale(0);opacity:0;
-    animation:dial-ripple 2.4s ease-out infinite;
-  }
-  .dial .ripple span:nth-child(2){animation-delay:.8s;}
-  .dial .ripple span:nth-child(3){animation-delay:1.6s;}
-  @keyframes dial-ripple{
-    0%{transform:translate(-50%,-50%) scale(0);opacity:.55;}
-    100%{transform:translate(-50%,-50%) scale(3.2);opacity:0;}
+  /* 処理中(送信・整形待ち):波紋(輪が広がって消える)表現は、視線を外側へ誘導する
+     動きのため見ていて酔うような不快感があると判明したため廃止。
+     代わりに、瞑想・呼吸法アプリで一般的な「ゆっくり伸縮する円」にする。
+     丸全体を中心軸で10〜15%程度ゆっくり拡大縮小させ、拡大時にわずかに濃い色
+     (--accent-strong)、縮小時に基準色(--accent)へ、同じタイミングで連動させる。
+     視線誘導がなく、対称的な動きのため不快感が生じにくい。 */
+  .clock.processing .dial{animation:dial-breathe 7s ease-in-out infinite;}
+  @keyframes dial-breathe{
+    0%,100%{transform:scale(1);background-color:var(--accent);}
+    50%{transform:scale(1.12);background-color:var(--accent-strong);}
   }
   /* 録音の経過時間(HH:MM:SS)。録音前は時刻の代わりに「録音開始」を表示するボタンとして機能する */
   .time{
@@ -601,9 +591,7 @@
 
   @media (prefers-reduced-motion:reduce){
     .clock,.toast,.rec-dot,.report-selection-btn{transition:none;}
-    .dial .ripple span{
-      animation:none;opacity:.4;transform:translate(-50%,-50%) scale(1.6);
-    }
+    .clock.processing .dial{animation:none;}
   }
 </style>
 </head>
@@ -669,7 +657,6 @@
           <circle class="track" cx="107" cy="107" r="101"></circle>
           <circle class="sweep" id="sweep" cx="107" cy="107" r="101"></circle>
         </svg>
-        <div class="ripple" aria-hidden="true"><span></span><span></span><span></span></div>
         <div class="face">
           <div class="idle-prompt" id="idlePrompt">
             <svg class="mic-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
