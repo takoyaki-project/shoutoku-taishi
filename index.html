@@ -383,21 +383,48 @@
   .trim-card.show{display:block;}
   .trim-card h2{font-size:17px;margin-bottom:4px;}
   .trim-lead{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:6px;}
-  .wave-wrap{
-    position:relative;height:48px;border-radius:12px;overflow:hidden;
-    background:var(--paper);border:1px solid var(--line);margin-bottom:10px;
+  /* 開始・終了の現在値。ドラッグ中もハンドルの吹き出しとは別に、常時ここで確認できる */
+  .trim-readout{display:flex;justify-content:space-between;margin-bottom:4px;}
+  .trim-readout-item{display:flex;align-items:baseline;gap:6px;}
+  .trim-readout-label{font-size:12px;color:var(--muted);}
+  .trim-readout-time{font-size:16px;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink);}
+  /* 波形バー+開始/終了ハンドル。ハンドルの吹き出し分の余白を上に確保する */
+  .wave-wrap{position:relative;height:48px;margin:32px 0 10px;}
+  .wave-canvas-clip{
+    position:absolute;inset:0;border-radius:12px;overflow:hidden;
+    background:var(--paper);border:1px solid var(--line);
   }
-  .wave-wrap canvas{width:100%;height:100%;display:block;}
-  .trim-field{margin:8px 0;}
-  .trim-field-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
-  .trim-field label{font-size:13px;color:var(--muted);}
-  .trim-time{font-size:16px;font-variant-numeric:tabular-nums;font-weight:600;}
-  .trim-range{width:100%;accent-color:var(--accent);min-height:32px;}
-  .trim-nudge{display:flex;gap:8px;margin-top:5px;}
-  .trim-nudge button{
-    min-height:44px;flex:1;border:1px solid var(--line);border-radius:10px;
-    background:var(--paper);color:var(--ink);font-size:14px;cursor:pointer;
+  .wave-canvas-clip canvas{width:100%;height:100%;display:block;}
+  .trim-range-native{display:none;}
+  /* ハンドル:見た目のつまみ(10px)は細いが、実際のドラッグ判定領域は44px確保する */
+  .trim-handle{
+    position:absolute;top:-4px;bottom:-4px;left:0;width:44px;margin-left:-22px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:grab;touch-action:none;z-index:2;
   }
+  .trim-handle:active{cursor:grabbing;}
+  .trim-handle-grip{
+    width:10px;height:100%;border-radius:5px;
+    background:var(--accent);box-shadow:0 0 0 2px var(--card);
+    pointer-events:none;
+  }
+  .trim-handle:focus-visible{outline:none;}
+  .trim-handle:focus-visible .trim-handle-grip{
+    box-shadow:0 0 0 2px var(--card),0 0 0 5px var(--accent-soft);
+  }
+  /* ドラッグ中、指に隠れないようハンドルの上に現在時刻を大きく表示する吹き出し */
+  .trim-bubble{
+    position:absolute;left:0;bottom:calc(100% + 8px);transform:translateX(-50%);
+    background:var(--ink);color:var(--paper);font-size:15px;font-weight:700;
+    padding:6px 10px;border-radius:8px;white-space:nowrap;
+    opacity:0;pointer-events:none;transition:opacity .15s;
+    font-variant-numeric:tabular-nums;z-index:3;
+  }
+  .trim-bubble::after{
+    content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+    border:5px solid transparent;border-top-color:var(--ink);
+  }
+  .trim-bubble.show{opacity:1;}
   .trim-summary{
     margin:6px 0;padding:7px 14px;border-radius:12px;
     background:var(--accent-soft);font-size:13px;color:var(--accent);line-height:1.5;
@@ -666,29 +693,23 @@
   <section class="trim-card" id="trimCard" aria-labelledby="trimTitle">
     <h2 id="trimTitle">送信する範囲を確認</h2>
     <p class="trim-lead">AIに送る範囲を確認してください。前後の不要な音声を除いてから記録を作成できます。</p>
-    <div class="wave-wrap"><canvas id="waveCanvas" aria-label="録音した音声の波形"></canvas></div>
 
-    <div class="trim-field">
-      <div class="trim-field-head">
-        <label for="trimStart">開始位置</label><span class="trim-time" id="trimStartTime">00:00:00</span>
-      </div>
-      <input class="trim-range" id="trimStart" type="range" min="0" max="1" step="1" value="0">
-      <div class="trim-nudge">
-        <button type="button" data-trim="start" data-delta="-1">開始を −1秒</button>
-        <button type="button" data-trim="start" data-delta="1">開始を ＋1秒</button>
-      </div>
+    <div class="trim-readout">
+      <div class="trim-readout-item"><span class="trim-readout-label">開始</span><span class="trim-readout-time" id="trimStartTime">00:00:00</span></div>
+      <div class="trim-readout-item"><span class="trim-readout-label">終了</span><span class="trim-readout-time" id="trimEndTime">00:00:00</span></div>
     </div>
-
-    <div class="trim-field">
-      <div class="trim-field-head">
-        <label for="trimEnd">終了位置</label><span class="trim-time" id="trimEndTime">00:00:00</span>
-      </div>
-      <input class="trim-range" id="trimEnd" type="range" min="3" max="3" step="1" value="3">
-      <div class="trim-nudge">
-        <button type="button" data-trim="end" data-delta="-1">終了を −1秒</button>
-        <button type="button" data-trim="end" data-delta="1">終了を ＋1秒</button>
-      </div>
+    <div class="wave-wrap" id="waveWrap">
+      <div class="wave-canvas-clip"><canvas id="waveCanvas" aria-label="録音した音声の波形"></canvas></div>
+      <div class="trim-handle" id="trimHandleStart" role="slider" tabindex="0"
+           aria-label="開始位置" aria-valuemin="0" aria-valuenow="0"><span class="trim-handle-grip"></span></div>
+      <div class="trim-handle" id="trimHandleEnd" role="slider" tabindex="0"
+           aria-label="終了位置" aria-valuemin="0" aria-valuenow="0"><span class="trim-handle-grip"></span></div>
+      <div class="trim-bubble" id="trimBubble" aria-hidden="true"></div>
     </div>
+    <!-- 開始/終了の秒数はこの2つのinputを内部状態として保持する(クランプ・永続化ロジックを流用するため)。
+         実際の操作は上のtrim-handleで行うので、ここは非表示にする。 -->
+    <input id="trimStart" type="range" min="0" max="1" step="1" value="0" class="trim-range-native" tabindex="-1" aria-hidden="true">
+    <input id="trimEnd" type="range" min="3" max="3" step="1" value="3" class="trim-range-native" tabindex="-1" aria-hidden="true">
 
     <div class="trim-summary" id="trimSummary"></div>
     <audio id="trimAudio" preload="metadata"></audio>
@@ -1182,8 +1203,9 @@ REIT=不動産投資信託。読みは「リート」
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
         recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn'), recoveryTextEl=$('recoveryText'),
         modeBusinessBtn=$('modeBusinessBtn'), modeMemoBtn=$('modeMemoBtn'),
-        trimCardEl=$('trimCard'), waveCanvasEl=$('waveCanvas'),
+        trimCardEl=$('trimCard'), waveCanvasEl=$('waveCanvas'), waveWrapEl=$('waveWrap'),
         trimStartEl=$('trimStart'), trimEndEl=$('trimEnd'),
+        trimHandleStartEl=$('trimHandleStart'), trimHandleEndEl=$('trimHandleEnd'), trimBubbleEl=$('trimBubble'),
         trimStartTimeEl=$('trimStartTime'), trimEndTimeEl=$('trimEndTime'), trimSummaryEl=$('trimSummary'),
         trimPreviewBtn=$('trimPreviewBtn'), trimConfirmBtn=$('trimConfirmBtn'),
         trimFullBtn=$('trimFullBtn'), trimDiscardBtn=$('trimDiscardBtn'), trimAudioEl=$('trimAudio');
@@ -1695,8 +1717,7 @@ REIT=不動産投資信託。読みは「リート」
     normalizeTrimValues(changed);
     trimStartTimeEl.textContent=fmtLongTime(trimStartSec);
     trimEndTimeEl.textContent=fmtLongTime(trimEndSec);
-    trimStartEl.setAttribute('aria-valuetext',fmtLongTime(trimStartSec));
-    trimEndEl.setAttribute('aria-valuetext',fmtLongTime(trimEndSec));
+    updateTrimHandles();
     const duration=Math.max(0,trimEndSec-trimStartSec);
     const cost=calcCostJPY(duration,null);
     trimSummaryEl.textContent=`使用する長さ ${fmtLongTime(duration)}・文字起こし概算 約${cost.toLocaleString('ja-JP')}円`;
@@ -1706,6 +1727,85 @@ REIT=不動産投資信託。読みは「リート」
       trimPersistTimer=setTimeout(()=>touchSession(),250);
     }
   }
+
+  // ===== トリミング:波形バー上のハンドルをドラッグして開始/終了位置を調整する =====
+  // 開始・終了の秒数そのものはtrimStartSec/trimEndSec(とその保持用のtrimStart/trimEnd
+  // input)で管理し、ここではハンドルの見た目(位置・吹き出し)の同期のみを行う。
+  function updateTrimHandles(){
+    if(!lastDuration) return;
+    const startPct=Math.max(0,Math.min(100,(trimStartSec/lastDuration)*100));
+    const endPct=Math.max(0,Math.min(100,(trimEndSec/lastDuration)*100));
+    trimHandleStartEl.style.left=startPct+'%';
+    trimHandleEndEl.style.left=endPct+'%';
+    trimHandleStartEl.setAttribute('aria-valuemax',String(Math.round(lastDuration)));
+    trimHandleEndEl.setAttribute('aria-valuemax',String(Math.round(lastDuration)));
+    trimHandleStartEl.setAttribute('aria-valuenow',String(Math.round(trimStartSec)));
+    trimHandleEndEl.setAttribute('aria-valuenow',String(Math.round(trimEndSec)));
+    trimHandleStartEl.setAttribute('aria-valuetext',fmtLongTime(trimStartSec));
+    trimHandleEndEl.setAttribute('aria-valuetext',fmtLongTime(trimEndSec));
+    if(trimDragging){
+      const bubbleEl=trimDragging==='start'?trimHandleStartEl:trimHandleEndEl;
+      trimBubbleEl.style.left=bubbleEl.style.left;
+      trimBubbleEl.textContent=fmtLongTime(trimDragging==='start'?trimStartSec:trimEndSec);
+    }
+  }
+
+  // ドラッグ位置(clientX)を、波形バーの幅に対する比率から秒数に変換する(1秒単位に丸める)
+  function trimSecFromClientX(clientX){
+    const rect=waveWrapEl.getBoundingClientRect();
+    if(!rect.width) return 0;
+    const ratio=Math.max(0,Math.min(1,(clientX-rect.left)/rect.width));
+    return Math.round(ratio*lastDuration);
+  }
+
+  let trimDragging=null; // 'start' | 'end' | null
+
+  function applyTrimHandleValue(which,sec){
+    if(which==='start'){ trimStartEl.value=String(sec); updateTrimUI(true,'start'); }
+    else{ trimEndEl.value=String(sec); updateTrimUI(true,'end'); }
+  }
+
+  function startTrimDrag(which,pointerId,target){
+    trimDragging=which;
+    stopPreview();
+    try{ target.setPointerCapture(pointerId); }catch(e){}
+    trimBubbleEl.classList.add('show');
+    updateTrimHandles();
+  }
+  function endTrimDrag(){
+    trimDragging=null;
+    trimBubbleEl.classList.remove('show');
+  }
+
+  function wireTrimHandle(el,which){
+    el.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      startTrimDrag(which,e.pointerId,el);
+      applyTrimHandleValue(which,trimSecFromClientX(e.clientX));
+    });
+    el.addEventListener('pointermove',e=>{
+      if(trimDragging!==which) return;
+      applyTrimHandleValue(which,trimSecFromClientX(e.clientX));
+    });
+    el.addEventListener('pointerup',()=>{ if(trimDragging===which) endTrimDrag(); });
+    el.addEventListener('pointercancel',()=>{ if(trimDragging===which) endTrimDrag(); });
+    // キーボード操作(矢印キーで±1秒、Home/Endで両端へ)。ネイティブrange inputを
+    // 非表示にした代わりに、role="slider"のハンドル自身でキーボード操作を担う。
+    el.addEventListener('keydown',e=>{
+      const cur=which==='start'?trimStartSec:trimEndSec;
+      let next=null;
+      if(e.key==='ArrowLeft'||e.key==='ArrowDown') next=cur-1;
+      else if(e.key==='ArrowRight'||e.key==='ArrowUp') next=cur+1;
+      else if(e.key==='Home') next=0;
+      else if(e.key==='End') next=lastDuration;
+      if(next===null) return;
+      e.preventDefault();
+      stopPreview();
+      applyTrimHandleValue(which,Math.round(next));
+    });
+  }
+  wireTrimHandle(trimHandleStartEl,'start');
+  wireTrimHandle(trimHandleEndEl,'end');
 
   function drawWaveform(){
     const canvas=waveCanvasEl;
@@ -2446,15 +2546,7 @@ REIT=不動産投資信託。読みは「リート」
   endRecBtnEl.addEventListener('click', ()=>{ if(recording) stop(); });
 
   // ===== トリミング画面の操作 =====
-  trimStartEl.addEventListener('input',()=>{ stopPreview();updateTrimUI(true,'start'); });
-  trimEndEl.addEventListener('input',()=>{ stopPreview();updateTrimUI(true,'end'); });
-  document.querySelectorAll('[data-trim][data-delta]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const target=btn.dataset.trim==='start'?trimStartEl:trimEndEl;
-      target.value=String((Number(target.value)||0)+Number(btn.dataset.delta));
-      stopPreview();updateTrimUI(true,btn.dataset.trim);
-    });
-  });
+  // 開始/終了の操作自体は波形バー上のハンドル(wireTrimHandleで配線済み)で行う。
   trimPreviewBtn.onclick=()=>{
     if(previewAudio && !previewAudio.paused) stopPreview();
     else playPreviewFrom(trimStartSec);
