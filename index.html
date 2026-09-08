@@ -86,34 +86,10 @@
   }
   .gear svg{width:22px;height:22px;}
 
-  /* ---- 初回案内A・B共通:大きさ・位置は別々だが、背景色のトーン(淡いグリーン)だけ揃える ---- */
-  /* 案内B: 設定アイコンを指す吹き出し(辞書機能の紹介)。大きさ・位置は変更せず、
-     背景色だけ黒から淡いグリーン(案内Aと同じ不透明色)に変更する。
-     --top-softは半透明トークンで背後の文字が透けてしまうため、ここでは使わない。 */
-  .onboard-msg{
-    display:none;z-index:15;
-    background:#E5ECEA;color:var(--ink);border-radius:14px;
-    padding:16px 36px 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,.22);
-  }
-  .onboard-msg.show{display:block;}
-  .onboard-msg p{font-size:13px;line-height:1.8;color:var(--ink);margin:0;position:relative;}
-  .onboard-msg .onboard-close{
-    position:absolute;top:6px;right:6px;background:none;border:none;
-    color:var(--muted);font-size:18px;line-height:1;width:28px;height:28px;
-    cursor:pointer;display:flex;align-items:center;justify-content:center;
-  }
-  #onboardB{
-    position:absolute;top:52px;right:6px;
-    width:min(272px, calc(100vw - 48px));
-  }
-  #onboardB::before{
-    content:'';position:absolute;top:-6px;right:18px;
-    width:12px;height:12px;background:#E5ECEA;transform:rotate(45deg);
-  }
-
-  /* 案内A: アプリ全体の自己紹介。警告的な黒背景オーバーレイにはせず、
-     画面の最前面・中央に、大きなフォントで堂々と表示する。
-     案内Bと同じ不透明色(#E5ECEA)を使うことで、背景色のトーンだけ揃える。 */
+  /* ---- 初回案内A:アプリ全体の自己紹介 ----
+     警告的な黒背景オーバーレイにはせず、画面の最前面・中央に、大きなフォントで
+     堂々と表示する。フォント(書体)は独自指定せず、bodyの既定フォントに揃える
+     (案内Bのスポットライト演出とも書体を統一するため)。 */
   .onboard-a-overlay{
     display:none;position:fixed;inset:0;z-index:16;
     align-items:center;justify-content:center;padding:24px;
@@ -132,6 +108,36 @@
     position:absolute;top:10px;right:10px;background:none;border:none;
     color:var(--muted);font-size:22px;line-height:1;width:34px;height:34px;
     cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---- 初回案内B:辞書機能の紹介(スポットライト/コーチマーク演出) ----
+     画面全体を暗いレイヤーで覆い、設定アイコンの部分だけを丸くくり抜いて
+     明るく浮き出させ、その下に大きな白文字で説明を表示する。
+     暗いレイヤーは.spotlight-hole(歯車に合わせた円)の巨大なbox-shadowで
+     作る定番の実装方法:穴の部分だけ影が塗られず、背後の実際の歯車が
+     素通しで見える。穴の座標はJS(positionSpotlight)で歯車の実位置に
+     合わせて設定する。フォントは案内Aと同じくbody既定のまま指定しない。 */
+  .spotlight-overlay{display:none;position:fixed;inset:0;z-index:20;}
+  .spotlight-overlay.show{display:block;}
+  .spotlight-hole{
+    position:fixed;border-radius:50%;pointer-events:none;
+    /* 背後の通常画面の文字と重なって読みにくくならないよう、単なる「薄い透過」
+       よりは十分に暗くする(読みやすさを優先)。 */
+    box-shadow:0 0 0 9999px rgba(14,18,17,.9);
+  }
+  .spotlight-text{position:fixed;left:24px;right:24px;}
+  .spotlight-text p{
+    margin:0;color:#fff;font-size:22px;font-weight:700;line-height:1.7;
+    text-shadow:0 2px 14px rgba(0,0,0,.45);
+  }
+  /* バツ(×)で閉じる操作を維持しつつ、タイトル文字や歯車(スポットライトの穴)と
+     重ならないよう、画面下部に置く */
+  .spotlight-close{
+    position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));
+    transform:translateX(-50%);z-index:21;
+    background:none;border:1px solid rgba(255,255,255,.5);border-radius:50%;
+    color:#fff;font-size:26px;line-height:1;width:44px;height:44px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
   }
 
   /* ---- 設定画面:辞書説明・お問い合わせ等のリンク導線 ---- */
@@ -227,18 +233,30 @@
      代わりに、瞑想・呼吸法アプリで一般的な「ゆっくり伸縮する円」にする。
      丸全体を中心軸で10〜15%程度ゆっくり拡大縮小させ、色の濃淡も同じタイミングで
      連動させる。視線誘導がなく、対称的な動きのため不快感が生じにくい。
-     圧迫感を抑えるため、処理中だけ丸自体のサイズを縮小する(録音中の見た目は
-     変更しない)。サイズ感を見て調整したい場合は、このwidth/heightの値だけ
-     変えればよい。色は「今の濃い緑(--accent)」より薄いトーンを基準にし、
-     濃淡の変化幅もはっきり分かるよう広げる(薄いdim-mode用の--accent値↔
-     通常の--accent値の間で変化させる)。 */
-  .clock.processing .dial{
-    width:160px;height:160px;
-    animation:dial-breathe 7s ease-in-out infinite;
+     「圧迫感がある」「濃淡が分からない」の指摘が繰り返し出たため、大きさ・濃淡の
+     異なる3パターンを用意し、下のLOADING_ANIMATION_VARIANT定数(JS側)で
+     切り替えて実機で比較できるようにしている。採用するパターンが決まったら、
+     他の2パターンのCSSは削除してよい。 */
+  .clock.processing.loading-variant-1 .dial{
+    width:120px;height:120px;animation:dial-breathe-1 7s ease-in-out infinite;
   }
-  @keyframes dial-breathe{
-    0%,100%{transform:scale(1);background-color:#4C7B74;}
+  @keyframes dial-breathe-1{
+    0%,100%{transform:scale(1);background-color:#A9C4C0;}
+    50%{transform:scale(1.12);background-color:#6E938E;}
+  }
+  .clock.processing.loading-variant-2 .dial{
+    width:145px;height:145px;animation:dial-breathe-2 7s ease-in-out infinite;
+  }
+  @keyframes dial-breathe-2{
+    0%,100%{transform:scale(1);background-color:#7FA39D;}
     50%{transform:scale(1.12);background-color:var(--accent);}
+  }
+  .clock.processing.loading-variant-3 .dial{
+    width:120px;height:120px;animation:dial-breathe-3 7s ease-in-out infinite;
+  }
+  @keyframes dial-breathe-3{
+    0%,100%{transform:scale(1);background-color:#A9C4C0;}
+    50%{transform:scale(1.12);background-color:#7FA39D;}
   }
   /* 録音の経過時間(HH:MM:SS)。録音前は時刻の代わりに「録音開始」を表示するボタンとして機能する */
   .time{
@@ -618,11 +636,6 @@
         <circle cx="12" cy="12" r="3"/>
       </svg>
     </button>
-    <!-- 初回案内B:辞書機能の紹介(案内Aを閉じた直後に表示する吹き出し) -->
-    <div class="onboard-msg" id="onboardB">
-      <p>保険用語に対応した辞書を持っていますが、まだ完璧ではありません。誤変換に気づいたときは、その単語を選択すると「報告」できます。報告は辞書の改善に役立ちます。よく出るお客様のお名前などは、ご自身で登録できるユーザー辞書があります。</p>
-      <button type="button" class="onboard-close" id="onboardBCloseBtn" aria-label="閉じる">×</button>
-    </div>
   </header>
   <div class="header-line"></div>
 
@@ -632,6 +645,17 @@
       <p>このアプリは、保険商談を録音するだけで、AIが自動で文字起こし・要約し、提出できる記録に仕上げます。<br>録音データは端末内にのみ保存され、外部のサーバーに保管されることはありません。</p>
       <button type="button" class="onboard-close" id="onboardACloseBtn" aria-label="閉じる">×</button>
     </div>
+  </div>
+
+  <!-- 初回案内B:辞書機能の紹介(案内Aを閉じた直後に表示するスポットライト演出)。
+       画面全体を暗くし、設定の歯車アイコンの部分だけを丸くくり抜いて浮き出させ、
+       その下に説明テキストを表示する。歯車の位置に合わせた穴の座標はJSで設定する。 -->
+  <div class="spotlight-overlay" id="onboardB" role="dialog" aria-label="辞書機能の紹介">
+    <div class="spotlight-hole" id="spotlightHole" aria-hidden="true"></div>
+    <div class="spotlight-text" id="spotlightText">
+      <p>保険用語に対応した辞書を持っていますが、まだ完璧ではありません。誤変換に気づいたときは、その単語を選択すると「報告」できます。報告は辞書の改善に役立ちます。よく出るお客様のお名前などは、ご自身で登録できるユーザー辞書があります。</p>
+    </div>
+    <button type="button" class="spotlight-close" id="onboardBCloseBtn" aria-label="閉じる">×</button>
   </div>
 
   <div class="pause-card" id="recoveryCard">
@@ -793,6 +817,9 @@
   // デザイン確認用の一時的な切り替え。trueの間は「閉じたら二度と出ない」判定を無視し、
   // 毎回リロードのたびに案内A・Bを表示する。確認が終わったらfalseに戻すこと(恒久仕様ではない)。
   const FORCE_SHOW_ONBOARDING = true;
+  // 処理中ローディングの見比べ用スイッチ。1/2/3で丸の大きさ・濃淡パターンを切り替える
+  // (CSSの.loading-variant-1/2/3を参照)。採用パターンが決まったら固定してよい。
+  const LOADING_ANIMATION_VARIANT = 1;
 
   // ============================================================
   // ここが唯一の「フォーマット定義」箇所です。
@@ -1195,6 +1222,7 @@ REIT=不動産投資信託。読みは「リート」
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
         userDictWrongEl=$('userDictWrong'), userDictRightEl=$('userDictRight'), userDictListEl=$('userDictList'),
         onboardAEl=$('onboardA'), onboardBEl=$('onboardB'),
+        spotlightHoleEl=$('spotlightHole'), spotlightTextEl=$('spotlightText'), gearBtnEl=$('gearBtn'),
         toastEl=$('toast'), reportSelectionBtn=$('reportSelectionBtn'), consentCheck=$('consentCheck'),
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
         recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn'), recoveryTextEl=$('recoveryText'),
@@ -2445,8 +2473,22 @@ REIT=不動産投資信託。読みは「リート」
   };
 
   // ===== 初回案内(案内A→案内Bの順で、それぞれ初回のみ表示) =====
+  // 案内B(スポットライト)の穴とテキストを、実際の歯車アイコンの画面位置に合わせて配置する
+  function positionSpotlight(){
+    const r=gearBtnEl.getBoundingClientRect();
+    const cx=r.left+r.width/2, cy=r.top+r.height/2;
+    const holeSize=Math.max(r.width,r.height)+18;
+    spotlightHoleEl.style.width=holeSize+'px';
+    spotlightHoleEl.style.height=holeSize+'px';
+    spotlightHoleEl.style.left=(cx-holeSize/2)+'px';
+    spotlightHoleEl.style.top=(cy-holeSize/2)+'px';
+    spotlightTextEl.style.top=(r.bottom+28)+'px';
+  }
   function showOnboardB(){
-    if(FORCE_SHOW_ONBOARDING || !localStorage.getItem(ONBOARD_B)) onboardBEl.classList.add('show');
+    if(FORCE_SHOW_ONBOARDING || !localStorage.getItem(ONBOARD_B)){
+      positionSpotlight();
+      onboardBEl.classList.add('show');
+    }
   }
   function initOnboarding(){
     if(FORCE_SHOW_ONBOARDING || !localStorage.getItem(ONBOARD_A)){
@@ -2455,6 +2497,9 @@ REIT=不動産投資信託。読みは「リート」
       showOnboardB();
     }
   }
+  window.addEventListener('resize',()=>{
+    if(onboardBEl.classList.contains('show')) positionSpotlight();
+  });
   $('onboardACloseBtn').onclick=()=>{
     localStorage.setItem(ONBOARD_A,'1');
     onboardAEl.classList.remove('show');
@@ -2582,6 +2627,7 @@ REIT=不動産投資信託。読みは「リート」
   updateConsentUI();
 
   // ===== 初期化 =====
+  clockCard.classList.add('loading-variant-'+LOADING_ANIMATION_VARIANT);
   renderHistory();
   checkForRecovery(); // 前回終了時に送信できていない録音が残っていないか確認する
   initOnboarding();
