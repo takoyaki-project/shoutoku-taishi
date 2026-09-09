@@ -104,7 +104,9 @@
   .onboard-a-card p{
     font-size:17px;line-height:1.9;color:var(--ink);font-weight:500;margin:0;
   }
-  .onboard-a-card .onboard-close{
+  /* 閉じる(×)ボタンの見た目は案内A・Bで共通にする(親要素は両方ともposition
+     が非staticなので、このルールだけでどちらでも同じ位置・見た目になる)。 */
+  .onboard-close{
     position:absolute;top:10px;right:10px;background:none;border:none;
     color:var(--muted);font-size:22px;line-height:1;width:34px;height:34px;
     cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -112,32 +114,27 @@
 
   /* ---- 初回案内B:辞書機能の紹介(スポットライト/コーチマーク演出) ----
      画面全体を暗いレイヤーで覆い、設定アイコンの部分だけを丸くくり抜いて
-     明るく浮き出させ、その下に大きな白文字で説明を表示する。
-     暗いレイヤーは.spotlight-hole(歯車に合わせた円)の巨大なbox-shadowで
-     作る定番の実装方法:穴の部分だけ影が塗られず、背後の実際の歯車が
-     素通しで見える。穴の座標はJS(positionSpotlight)で歯車の実位置に
-     合わせて設定する。フォントは案内Aと同じくbody既定のまま指定しない。 */
+     明るく浮き出させる(この「スポットライト」の仕組みは維持する)。
+     説明テキストは、暗幕の上に直接白文字を置くのではなく、案内Aと同じ
+     淡いグリーンのカード(.onboard-a-cardと同じ背景・書体・文字サイズ・
+     太さ・行間・閉じるボタン)で表示し、Aとの見た目の統一感を優先する。
+     暗幕の色も黒系ではなく、D案の深緑を基調にした半透明にする。
+     穴の座標・カードの位置はJS(positionSpotlight)で歯車の実位置に
+     合わせて設定する。 */
   .spotlight-overlay{display:none;position:fixed;inset:0;z-index:20;}
   .spotlight-overlay.show{display:block;}
   .spotlight-hole{
     position:fixed;border-radius:50%;pointer-events:none;
-    /* 背後の通常画面の文字と重なって読みにくくならないよう、単なる「薄い透過」
-       よりは十分に暗くする(読みやすさを優先)。 */
-    box-shadow:0 0 0 9999px rgba(14,18,17,.9);
+    box-shadow:0 0 0 9999px rgba(24,48,45,.72);
   }
-  .spotlight-text{position:fixed;left:24px;right:24px;}
-  .spotlight-text p{
-    margin:0;color:#fff;font-size:22px;font-weight:700;line-height:1.7;
-    text-shadow:0 2px 14px rgba(0,0,0,.45);
+  .spotlight-card{
+    position:fixed;
+    background:#E5ECEA;border:1px solid var(--top-line);border-radius:20px;
+    padding:34px 30px 30px;
+    box-shadow:0 20px 50px rgba(0,0,0,.22);
   }
-  /* バツ(×)で閉じる操作を維持しつつ、タイトル文字や歯車(スポットライトの穴)と
-     重ならないよう、画面下部に置く */
-  .spotlight-close{
-    position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));
-    transform:translateX(-50%);z-index:21;
-    background:none;border:1px solid rgba(255,255,255,.5);border-radius:50%;
-    color:#fff;font-size:26px;line-height:1;width:44px;height:44px;
-    display:flex;align-items:center;justify-content:center;cursor:pointer;
+  .spotlight-card p{
+    font-size:17px;line-height:1.9;color:var(--ink);font-weight:500;margin:0;
   }
 
   /* ---- 設定画面:辞書説明・お問い合わせ等のリンク導線 ---- */
@@ -652,10 +649,10 @@
        その下に説明テキストを表示する。歯車の位置に合わせた穴の座標はJSで設定する。 -->
   <div class="spotlight-overlay" id="onboardB" role="dialog" aria-label="辞書機能の紹介">
     <div class="spotlight-hole" id="spotlightHole" aria-hidden="true"></div>
-    <div class="spotlight-text" id="spotlightText">
+    <div class="spotlight-card" id="spotlightCard">
       <p>保険用語に対応した辞書を持っていますが、まだ完璧ではありません。誤変換に気づいたときは、その単語を選択すると「報告」できます。報告は辞書の改善に役立ちます。よく出るお客様のお名前などは、ご自身で登録できるユーザー辞書があります。</p>
+      <button type="button" class="onboard-close" id="onboardBCloseBtn" aria-label="閉じる">×</button>
     </div>
-    <button type="button" class="spotlight-close" id="onboardBCloseBtn" aria-label="閉じる">×</button>
   </div>
 
   <div class="pause-card" id="recoveryCard">
@@ -1222,7 +1219,7 @@ REIT=不動産投資信託。読みは「リート」
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
         userDictWrongEl=$('userDictWrong'), userDictRightEl=$('userDictRight'), userDictListEl=$('userDictList'),
         onboardAEl=$('onboardA'), onboardBEl=$('onboardB'),
-        spotlightHoleEl=$('spotlightHole'), spotlightTextEl=$('spotlightText'), gearBtnEl=$('gearBtn'),
+        spotlightHoleEl=$('spotlightHole'), spotlightCardEl=$('spotlightCard'), gearBtnEl=$('gearBtn'),
         toastEl=$('toast'), reportSelectionBtn=$('reportSelectionBtn'), consentCheck=$('consentCheck'),
         pauseCardEl=$('pauseCard'), resumeBtnEl=$('resumeBtn'),
         recoveryCardEl=$('recoveryCard'), recoverBtnEl=$('recoverBtn'), recoveryTextEl=$('recoveryText'),
@@ -2473,7 +2470,7 @@ REIT=不動産投資信託。読みは「リート」
   };
 
   // ===== 初回案内(案内A→案内Bの順で、それぞれ初回のみ表示) =====
-  // 案内B(スポットライト)の穴とテキストを、実際の歯車アイコンの画面位置に合わせて配置する
+  // 案内B(スポットライト)の穴とカードを、実際の歯車アイコンの画面位置に合わせて配置する
   function positionSpotlight(){
     const r=gearBtnEl.getBoundingClientRect();
     const cx=r.left+r.width/2, cy=r.top+r.height/2;
@@ -2482,7 +2479,11 @@ REIT=不動産投資信託。読みは「リート」
     spotlightHoleEl.style.height=holeSize+'px';
     spotlightHoleEl.style.left=(cx-holeSize/2)+'px';
     spotlightHoleEl.style.top=(cy-holeSize/2)+'px';
-    spotlightTextEl.style.top=(r.bottom+28)+'px';
+    // カード(案内Aと同じ見た目)は、歯車のすぐ下・右寄せに配置する
+    const cardWidth=Math.min(320,window.innerWidth-32);
+    spotlightCardEl.style.width=cardWidth+'px';
+    spotlightCardEl.style.top=(r.bottom+14)+'px';
+    spotlightCardEl.style.right=Math.max(16,window.innerWidth-r.right)+'px';
   }
   function showOnboardB(){
     if(FORCE_SHOW_ONBOARDING || !localStorage.getItem(ONBOARD_B)){
