@@ -225,45 +225,36 @@
     position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;
   }
-  /* 処理中(送信・整形待ち):波紋(輪が広がって消える)表現は、視線を外側へ誘導する
-     動きのため見ていて酔うような不快感があると判明したため廃止。
-     代わりに、瞑想・呼吸法アプリで一般的な「ゆっくり伸縮する円」にする。
-     丸全体を中心軸で10〜15%程度ゆっくり拡大縮小させ、色の濃淡も同じタイミングで
-     連動させる。視線誘導がなく、対称的な動きのため不快感が生じにくい。
-     「圧迫感がある」「濃淡が分からない」の指摘が繰り返し出たため、大きさ・濃淡の
-     異なる3パターンを用意し、下のLOADING_ANIMATION_VARIANT定数(JS側)で
-     切り替えて実機で比較できるようにしている。採用するパターンが決まったら、
-     他の2パターンのCSSは削除してよい。 */
-  .clock.processing.loading-variant-1 .dial{
-    width:120px;height:120px;animation:dial-breathe-1 7s ease-in-out infinite;
+  /* 処理中(送信・整形待ち):波紋(視線誘導で酔う)、ゆっくりした伸縮(遅すぎて
+     動いているか分からない)を経て、ここでは円自体は静止した単色のまま、
+     円の中の小さなリングだけをきびきび回転させる(定番のローディングスピナー)。
+     「処理が生きて動いていること」だけを、速く・迷いなく伝えるのが目的で、
+     気持ちを落ち着かせる演出は意図的に持たせない。丸のサイズも、
+     以前より控えめな固定値にした(バリアント比較は終了、1パターンに確定)。 */
+  .clock.processing .dial{width:165px;height:165px;}
+  .processing-spinner{
+    display:none;width:26px;height:26px;border-radius:50%;margin:0 auto 10px;
+    border:3px solid rgba(255,255,255,.35);border-top-color:#fff;
+    animation:processing-spin .9s linear infinite;
   }
-  @keyframes dial-breathe-1{
-    0%,100%{transform:scale(1);background-color:#A9C4C0;}
-    50%{transform:scale(1.12);background-color:#6E938E;}
-  }
-  .clock.processing.loading-variant-2 .dial{
-    width:145px;height:145px;animation:dial-breathe-2 7s ease-in-out infinite;
-  }
-  @keyframes dial-breathe-2{
-    0%,100%{transform:scale(1);background-color:#7FA39D;}
-    50%{transform:scale(1.12);background-color:var(--accent);}
-  }
-  .clock.processing.loading-variant-3 .dial{
-    width:120px;height:120px;animation:dial-breathe-3 7s ease-in-out infinite;
-  }
-  @keyframes dial-breathe-3{
-    0%,100%{transform:scale(1);background-color:#A9C4C0;}
-    50%{transform:scale(1.12);background-color:#7FA39D;}
-  }
+  .clock.processing .processing-spinner{display:block;}
+  @keyframes processing-spin{to{transform:rotate(360deg);}}
   /* 録音の経過時間(HH:MM:SS)。録音前は時刻の代わりに「録音開始」を表示するボタンとして機能する */
   .time{
     font-size:52px;font-weight:200;letter-spacing:.02em;
     font-variant-numeric:tabular-nums;line-height:1;
     display:none;
   }
-  /* 処理中(送信・整形待ち)は経過時間の代わりに波紋アニメーションを出す。
-     数字は円からはみ出して読めないうえ、処理中は経過時間に意味がないため。 */
-  .clock.processing .time{display:none;}
+  /* 処理中は経過時間(録音時間)をそのまま表示し続ける。円が小さくなった分、
+     文字サイズを詰める。 */
+  .clock.processing .time{font-size:26px;letter-spacing:.03em;}
+  /* 処理中のコスト概算。トリミング画面の概算表示と同じ考え方(待たせている
+     自覚のある、簡潔な事実情報)を処理中画面にも引き継ぐ。 */
+  .processing-cost{
+    display:none;margin-top:4px;font-size:13px;color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+  .clock.processing .processing-cost{display:block;}
   .idle-prompt{
     display:flex;flex-direction:column;align-items:center;gap:10px;
     font-size:22px;font-weight:600;color:#fff;letter-spacing:.1em;
@@ -401,8 +392,10 @@
   .trim-readout-item{display:flex;align-items:baseline;gap:6px;}
   .trim-readout-label{font-size:13px;color:var(--muted);}
   .trim-readout-time{font-size:21px;font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink);}
-  /* 波形バー+開始/終了ハンドル。ハンドルの吹き出し分の余白を上に確保する。
-     波形が見やすいよう、余白を削るより高さを優先して確保する(48px→76px)。 */
+  /* 音量バー(レベルメーター表示)+開始/終了ハンドル。精密な波形の再現ではなく、
+     「音がある区間/無音区間」「選択範囲かどうか」を一目で区別できることを
+     優先する(バーの高さ=音量、バーの色=選択範囲内か外か)。
+     ハンドルの吹き出し分の余白を上に確保する。 */
   .wave-wrap{position:relative;height:76px;margin:32px 0 10px;}
   .wave-canvas-clip{
     position:absolute;inset:0;border-radius:12px;overflow:hidden;
@@ -615,7 +608,7 @@
 
   @media (prefers-reduced-motion:reduce){
     .clock,.toast,.rec-dot,.report-selection-btn{transition:none;}
-    .clock.processing .dial{animation:none;}
+    .processing-spinner{animation:none;}
   }
 </style>
 </head>
@@ -698,10 +691,12 @@
             <span>録音開始</span>
           </div>
           <div class="rec-label" id="recLabel"><span class="rec-dot" id="recDot" aria-hidden="true"></span><span id="recLabelText">録音中</span></div>
+          <div class="processing-spinner" aria-hidden="true"></div>
           <div class="time" id="elapsedTime">00:00:00</div>
         </div>
       </div>
       <div class="state" id="state"></div>
+      <div class="processing-cost" id="processingCost"></div>
       <button class="end-rec-btn" id="endRecBtn" type="button">録音を終了</button>
     </section>
     <p class="record-hint">同意を確認すると録音できます</p>
@@ -814,9 +809,6 @@
   // デザイン確認用の一時的な切り替え。trueの間は「閉じたら二度と出ない」判定を無視し、
   // 毎回リロードのたびに案内A・Bを表示する。確認が終わったらfalseに戻すこと(恒久仕様ではない)。
   const FORCE_SHOW_ONBOARDING = true;
-  // 処理中ローディングの見比べ用スイッチ。1/2/3で丸の大きさ・濃淡パターンを切り替える
-  // (CSSの.loading-variant-1/2/3を参照)。採用パターンが決まったら固定してよい。
-  const LOADING_ANIMATION_VARIANT = 1;
 
   // ============================================================
   // ここが唯一の「フォーマット定義」箇所です。
@@ -1213,7 +1205,7 @@ REIT=不動産投資信託。読みは「リート」
   const $ = id => document.getElementById(id);
   const clockCard=$('clockCard'), elapsedTimeEl=$('elapsedTime'),
         recLabelTextEl=$('recLabelText'), recDotEl=$('recDot'), endRecBtnEl=$('endRecBtn'),
-        stateEl=$('state'), sweepEl=$('sweep'),
+        stateEl=$('state'), sweepEl=$('sweep'), processingCostEl=$('processingCost'),
         noticeEl=$('notice'), historyEl=$('history'), countEl=$('count'),
         completedCardBodyEl=$('completedCardBody'), completedTitleEl=$('completedTitle'),
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
@@ -1451,11 +1443,13 @@ REIT=不動産投資信託。読みは「リート」
   }
   setInterval(updateSweep, 250);
 
-  // 処理中(送信・整形待ち)の見た目に切り替える。見た目自体は.clock.processingに
-  // 対応するCSS(丸の内部で波紋が広がって消える表現)で描画されるため、ここでは
-  // クラス付与のみ行う。
+  // 処理中(送信・整形待ち)の見た目に切り替える。円自体の見た目(静止した単色+
+  // 小さな回転スピナー)は.clock.processingに対応するCSSで描画されるため、
+  // ここではクラス付与と、円の下に出すコスト概算の文言更新を行う。
   function showProcessingState(){
     clockCard.classList.add('processing');
+    const cost=calcCostJPY(lastDuration,null);
+    processingCostEl.textContent=`概算 約${cost.toLocaleString('ja-JP')}円`;
   }
 
   // ===== 録音フォーマット判定 =====
@@ -1828,6 +1822,9 @@ REIT=不動産投資信託。読みは「リート」
   wireTrimHandle(trimHandleStartEl,'start');
   wireTrimHandle(trimHandleEndEl,'end');
 
+  // 音声の精密な波形ではなく、「音量バー(レベルメーター)」として描画する。
+  // ボイスメモ的な離散バーにすることで、音がある区間/無音区間の区別、
+  // 選択範囲内/外の区別(バーの色)を、連続した波形線より一目で読み取れるようにする。
   function drawWaveform(){
     const canvas=waveCanvasEl;
     const rect=canvas.getBoundingClientRect();
@@ -1839,25 +1836,27 @@ REIT=不動産投資信託。読みは「リート」
     const w=canvas.width,h=canvas.height,mid=h/2;
     ctx.clearRect(0,0,w,h);
     const samples=waveformSamples.length ? waveformSamples : [0.08];
-    const step=Math.max(1,Math.ceil(samples.length/w));
-    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2C5F5A';
-    ctx.lineWidth=Math.max(1,scale);
-    ctx.beginPath();
-    for(let x=0;x<w;x++){
-      const from=Math.floor(x/w*samples.length),to=Math.min(samples.length,from+step);
+    const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2C5F5A';
+    const barW=Math.max(2,Math.round(2.5*scale)), gap=Math.max(1,Math.round(2*scale));
+    const pitch=barW+gap;
+    const barCount=Math.max(1,Math.floor(w/pitch));
+    const total=lastDuration||1;
+    const startBar=Math.round((trimStartSec/total)*barCount);
+    const endBar=Math.round((trimEndSec/total)*barCount);
+    for(let i=0;i<barCount;i++){
+      const from=Math.floor(i/barCount*samples.length);
+      const to=Math.max(from+1,Math.floor((i+1)/barCount*samples.length));
       let peak=.05;
-      for(let i=from;i<to;i++) peak=Math.max(peak,samples[i]||0);
+      for(let j=from;j<to;j++) peak=Math.max(peak,samples[j]||0);
       // 通常の会話音量ではpeakが小さく、そのままだと振幅がほとんど見えず
-      // 波形が「潰れて」見えてしまうため、べき乗カーブで小さい値を持ち上げる
+      // バーが「潰れて」見えてしまうため、べき乗カーブで小さい値を持ち上げる
       // (peak=1のときは変化なし、peak=0.1でも約0.25まで持ち上がる)。
       const boosted=Math.pow(peak,0.6);
-      const amp=Math.max(1.5,boosted*(h*.42));
-      ctx.moveTo(x,mid-amp);ctx.lineTo(x,mid+amp);
+      const barH=Math.max(barW*1.4,boosted*(h*.86));
+      // 選択範囲内は基準色、範囲外は淡いグレーにして、どこを送るかが一目で分かるようにする。
+      ctx.fillStyle=(i>=startBar && i<endBar) ? accent : 'rgba(43,48,46,.32)';
+      ctx.fillRect(i*pitch, mid-barH/2, barW, barH);
     }
-    ctx.stroke();
-    ctx.fillStyle='rgba(43,48,46,.35)';
-    const left=w*(trimStartSec/lastDuration),right=w*(trimEndSec/lastDuration);
-    ctx.fillRect(0,0,left,h);ctx.fillRect(right,0,w-right,h);
   }
 
   function stopPreview(){
@@ -1990,7 +1989,7 @@ REIT=不動産投資信託。読みは「リート」
     }
   }
 
-  function resetState(){ stateEl.textContent=''; clockCard.classList.remove('processing'); } // 円の下の説明文は「録音開始」表示と重複するため出さない
+  function resetState(){ stateEl.textContent=''; processingCostEl.textContent=''; clockCard.classList.remove('processing'); } // 円の下の説明文は「録音開始」表示と重複するため出さない
 
   function resetSessionState(skipDbCleanup=false){
     const sidToClean = sessionId;
@@ -2628,7 +2627,6 @@ REIT=不動産投資信託。読みは「リート」
   updateConsentUI();
 
   // ===== 初期化 =====
-  clockCard.classList.add('loading-variant-'+LOADING_ANIMATION_VARIANT);
   renderHistory();
   checkForRecovery(); // 前回終了時に送信できていない録音が残っていないか確認する
   initOnboarding();
