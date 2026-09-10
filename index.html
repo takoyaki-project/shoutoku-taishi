@@ -586,6 +586,22 @@
     cursor:pointer;letter-spacing:.02em;text-align:center;
   }
 
+  /* ---- 設定画面:更新履歴(タップで開閉するアコーディオン) ---- */
+  .changelog{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);}
+  .changelog-heading{font-size:12px;color:var(--muted);letter-spacing:.08em;margin-bottom:2px;}
+  .changelog-item{border-bottom:1px solid var(--line);}
+  .changelog-item:last-child{border-bottom:none;}
+  .changelog-head{
+    display:flex;align-items:baseline;gap:10px;width:100%;min-height:44px;
+    background:none;border:none;padding:11px 2px;cursor:pointer;text-align:left;
+  }
+  .changelog-date{flex-shrink:0;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .changelog-title-text{flex:1;font-size:13px;color:var(--ink);font-weight:500;}
+  .changelog-caret{flex-shrink:0;color:var(--muted);font-size:11px;transition:transform .15s ease;}
+  .changelog-item.open .changelog-caret{transform:rotate(180deg);}
+  .changelog-body{display:none;padding:0 2px 12px;font-size:13px;color:var(--muted);line-height:1.7;}
+  .changelog-item.open .changelog-body{display:block;}
+
   .toast{
     position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));
     transform:translateX(-50%) translateY(20px);
@@ -792,6 +808,11 @@
       <button class="btn-save" id="saveBtn">保存</button>
     </div>
     <button class="reset-link" id="resetStuckBtn" type="button">未送信データを削除して初期化</button>
+
+    <div class="changelog">
+      <p class="changelog-heading">更新履歴</p>
+      <div id="changelogList"></div>
+    </div>
   </div>
 </div>
 
@@ -1202,6 +1223,32 @@ REIT=不動産投資信託。読みは「リート」
 - 検算は内部で行い、出力にはメモ本文のみを記載する。`,
   };
 
+  // 設定画面の「更新履歴」に表示する内容。配列の先頭が最新になるよう、
+  // 新しい項目はこの配列の先頭に1件追加するだけでよい(既存項目の並び替え不要)。
+  // 内容はgit logから拾える範囲でまとめたもの。
+  const CHANGELOG = [
+    { date:'2026-09-10', title:'送信中・トリミング画面のデザインを刷新',
+      body:'処理中の表示をシンプルな読み込みスピナーに、トリミング画面の波形を見やすいバー表示に変更しました。' },
+    { date:'2026-09-09', title:'初回案内のデザインを調整',
+      body:'アプリを開いたときの案内と、設定アイコンの説明を、該当箇所を照らして見せる形に整理しました。' },
+    { date:'2026-09-08', title:'トリミング画面を指でドラッグできる方式に変更',
+      body:'送信する範囲を、波形の上のハンドルを直接ドラッグして選べるようにしました。画面も1画面に収まるよう整理しています。' },
+    { date:'2026-09-07', title:'初回案内・ユーザー辞書・設定画面の整理',
+      body:'初めて開いたときの案内、よく出るお客様のお名前を登録できるユーザー辞書、誤変換の報告・お問い合わせ導線を追加し、設定画面の項目順を整理しました。' },
+    { date:'2026-09-06', title:'履歴一覧とトップ画面のデザインを刷新',
+      body:'履歴の各行に内容のプレビューを表示し、トップ画面をよりコンパクトに整理しました。' },
+    { date:'2026-09-05', title:'配色を深緑基調に統一、誤変換の報告機能を追加',
+      body:'全画面の配色を深緑×青緑に統一し、記録内の誤変換した単語を選択して報告できるボタンを追加しました。' },
+    { date:'2026-09-04', title:'録音後のトリミングと辞書の強化',
+      body:'録音後に秒単位で送信範囲を選べる機能を追加し、法人商談のテストで見つかった誤変換への対策や、AI処理失敗時の再試行を改善しました。' },
+    { date:'2026-08-28', title:'「商談」「メモ」モードと録音専用画面を追加',
+      body:'商談以外の場面でも使えるメモモードを追加し、録音中は専用の省電力画面に切り替わるようにしました。' },
+    { date:'2026-07-13〜17', title:'長時間録音対応と保険用語辞書、コスト概算表示',
+      body:'録音を分割して長時間の商談にも対応し、保険用語の誤変換を補正する辞書と、費用の概算表示を追加しました。' },
+    { date:'2026-07-12', title:'「聖徳太子」として公開',
+      body:'商談記録フォーマットに絞り込み、「聖徳太子」の名称でリリースしました。' },
+  ];
+
   const $ = id => document.getElementById(id);
   const clockCard=$('clockCard'), elapsedTimeEl=$('elapsedTime'),
         recLabelTextEl=$('recLabelText'), recDotEl=$('recDot'), endRecBtnEl=$('endRecBtn'),
@@ -1210,6 +1257,7 @@ REIT=不動産投資信託。読みは「リート」
         completedCardBodyEl=$('completedCardBody'), completedTitleEl=$('completedTitle'),
         modalBg=$('modalBg'), keyInput=$('keyInput'), mailInput=$('sendMail'),
         userDictWrongEl=$('userDictWrong'), userDictRightEl=$('userDictRight'), userDictListEl=$('userDictList'),
+        changelogListEl=$('changelogList'),
         onboardAEl=$('onboardA'), onboardBEl=$('onboardB'),
         spotlightHoleEl=$('spotlightHole'), spotlightCardEl=$('spotlightCard'), gearBtnEl=$('gearBtn'),
         toastEl=$('toast'), reportSelectionBtn=$('reportSelectionBtn'), consentCheck=$('consentCheck'),
@@ -2067,6 +2115,32 @@ REIT=不動産投資信託。読みは「リート」
     });
   }
 
+  // 設定画面の更新履歴。CHANGELOG(設定ゾーン内の配列)は静的な内容なので、
+  // モーダルを開くたびではなく初期化時に1回だけ描画する。
+  // 最新の1件(配列の先頭)だけ初期状態で開いた状態にする。
+  function renderChangelog(){
+    changelogListEl.innerHTML = '';
+    CHANGELOG.forEach((entry, i) => {
+      const item = document.createElement('div');
+      item.className = 'changelog-item' + (i===0 ? ' open' : '');
+      const head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'changelog-head';
+      head.innerHTML =
+        `<span class="changelog-date">${entry.date}</span>`+
+        `<span class="changelog-title-text"></span>`+
+        `<span class="changelog-caret" aria-hidden="true">▾</span>`;
+      head.querySelector('.changelog-title-text').textContent = entry.title;
+      const body = document.createElement('div');
+      body.className = 'changelog-body';
+      body.textContent = entry.body;
+      head.onclick = () => item.classList.toggle('open');
+      item.appendChild(head);
+      item.appendChild(body);
+      changelogListEl.appendChild(item);
+    });
+  }
+
   // 1チャンク分をWhisperに送信する。直前チャンクの文字起こし末尾をpromptに連結し文脈をつなぐ。
   // 失敗してもchunkListからは削除せず、'failed'として保持する(最大MAX_RETRY回まで自動リトライ)。
   async function sendChunk(c){
@@ -2628,6 +2702,7 @@ REIT=不動産投資信託。読みは「リート」
 
   // ===== 初期化 =====
   renderHistory();
+  renderChangelog();
   checkForRecovery(); // 前回終了時に送信できていない録音が残っていないか確認する
   initOnboarding();
   if(!localStorage.getItem(KEY)) setTimeout(openModal, 400);
